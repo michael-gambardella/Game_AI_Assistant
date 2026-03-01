@@ -24,7 +24,7 @@ const nextConfig = {
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
-      ...(isProduction ? ["upgrade-insecure-requests", "block-all-mixed-content"] : []),
+      ...(isProduction ? ["upgrade-insecure-requests"] : []),
     ].filter(Boolean);
     
     return [

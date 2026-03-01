@@ -104,9 +104,6 @@ export function getSecurityHeaders(request: NextRequest): Record<string, string>
     
     // Upgrade insecure requests: upgrade HTTP to HTTPS
     isProduction ? "upgrade-insecure-requests" : "",
-    
-    // Block all mixed content
-    isProduction ? "block-all-mixed-content" : "",
   ].filter(Boolean); // Remove empty strings
 
   headers['Content-Security-Policy'] = cspDirectives.join('; ');

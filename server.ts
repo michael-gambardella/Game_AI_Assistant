@@ -1,6 +1,6 @@
 import { createServer } from "http";
 import { parse, UrlWithParsedQuery } from "url";
-import next, { NextApiRequest, NextApiResponse } from "next";
+import next from "next";
 import { initSocket } from "./middleware/realtime";
 import { initializeScheduler } from "./utils/automatedUsersScheduler";
 import { initializeDiscordBot, shutdownDiscordBot } from "./utils/discordBot";
@@ -77,7 +77,7 @@ app.prepare().then(async () => {
       ? parse(req.url, true)
       : { query: {}, pathname: "/", path: null, href: "", search: null, slashes: null, auth: null, hash: null, host: null, hostname: null, port: null, protocol: null };
 
-    handle(req as unknown as NextApiRequest, res as unknown as NextApiResponse, parsedUrl);
+    handle(req, res, parsedUrl);
   });
 
   // Initialize the Socket.IO server
