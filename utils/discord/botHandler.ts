@@ -247,21 +247,6 @@ export class DiscordBotHandler {
       return; // Already sent response, don't process again
     }
     
-    // Check if this message is currently being processed
-    if (this.processingMessages.has(messageId)) {
-      logger.warn('handleMessage called but message already being processed, preventing duplicate', {
-        userId: message.author.id,
-        username: message.author.username,
-        messageId: messageId
-      });
-      return; // Already processing, don't start another
-    }
-    
-    // Mark as processing IMMEDIATELY
-    if (messageId) {
-      this.processingMessages.add(messageId);
-    }
-    
     try {
       logger.info('Processing Discord message', {
         userId: message.author.id,
@@ -828,4 +813,3 @@ Character: ${botConfig.bio[0]}`;
     }, 60000); // Every minute
   }
 }
-

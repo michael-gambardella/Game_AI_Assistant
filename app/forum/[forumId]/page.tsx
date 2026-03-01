@@ -1730,7 +1730,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                               // Parse @mentions and make them clickable
                               const message = post.message;
                               const mentionRegex = /@(\w+)/g;
-                              const parts: (string | React.JSX.Element)[] = [];
+                              const parts: (string | React.ReactElement)[] = [];
                               let lastIndex = 0;
                               let match;
 

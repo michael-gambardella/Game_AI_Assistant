@@ -64,22 +64,22 @@ function calculateMemoryDelta(before: ReturnType<typeof getMemoryUsage>, after: 
 
 /**
  * Weekly digest email cron job endpoint
- * Sends weekly summary emails to all users on Sunday at 8:00 PM UTC (3:00 PM EST)
+ * Sends weekly summary emails to all users on Sunday at 11:00 PM UTC (6:00 PM EST)
  * 
  * For Heroku deployment (recommended):
  * - Use an external cron service like EasyCron, Cron-job.org, UptimeRobot, etc.
  * - URL: https://your-app-name.herokuapp.com/api/cron/weekly-digest
- * - Schedule: "0 20 * * 0" (Sunday at 8:00 PM UTC / 3:00 PM EST)
+ * - Schedule: "0 23 * * 0" (Sunday at 11:00 PM UTC / 6:00 PM EST)
  * - Method: GET or POST
  * 
  * For Heroku Scheduler (if available):
  * - Install Heroku Scheduler add-on: heroku addons:create scheduler:standard
  * - Open scheduler: heroku addons:open scheduler
  * - Add job: curl https://your-app-name.herokuapp.com/api/cron/weekly-digest
- * - Schedule: Every Sunday at 8:00 PM UTC
+ * - Schedule: Every Sunday at 11:00 PM UTC
  * 
  * Note: The schedule is configured in your cron service, not in code.
- * The default schedule is Sunday at 8:00 PM UTC (3:00 PM EST).
+ * The default schedule is Sunday at 11:00 PM UTC (6:00 PM EST).
  * 
  * Security: Consider adding authentication (API key, secret header, etc.)
  * Uncomment the authentication check below and set CRON_SECRET in your environment variables.
@@ -113,10 +113,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const localMinute = today.getMinutes();
   const timezoneOffset = -today.getTimezoneOffset() / 60; // Offset in hours (negative because offset is backwards)
   
-  // Scheduled time: Sunday at 9:00 PM UTC (21:00 UTC) - matches Heroku Scheduler
-  // Allow a 2-hour window (20:00-21:59 UTC) to account for timing variations and scheduler delays
-  const SCHEDULED_HOUR_START = 20; // 8:00 PM UTC
-  const SCHEDULED_HOUR_END = 21; // 9:00 PM UTC
+  // Scheduled time: Sunday at 11:00 PM UTC (23:00 UTC) - matches Heroku Scheduler
+  // Allow a 2-hour window (22:00-23:59 UTC) to account for timing variations and scheduler delays
+  const SCHEDULED_HOUR_START = 22; // 10:00 PM UTC
+  const SCHEDULED_HOUR_END = 23; // 11:00 PM UTC
   
   const isScheduledDay = dayOfWeek === 0; // Sunday
   const isScheduledTime = currentHour >= SCHEDULED_HOUR_START && currentHour <= SCHEDULED_HOUR_END;
@@ -127,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     return res.status(200).json({
       success: true,
-      message: 'Weekly digest scheduled for Sunday between 8:00 PM - 9:59 PM UTC. Current time does not match schedule.',
+      message: 'Weekly digest scheduled for Sunday between 10:00 PM - 11:59 PM UTC. Current time does not match schedule.',
       currentDay: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
       currentTime: {
         utc: `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')} UTC`,
