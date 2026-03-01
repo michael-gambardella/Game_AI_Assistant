@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, use } from "react";
 import { useForum } from "../../../context/ForumContext";
 import { ForumProvider } from "../../../context/ForumContext";
 import axios from "axios";
@@ -16,11 +16,12 @@ import {
 export default function ForumPageWrapper({
   params,
 }: {
-  params: { forumId: string };
+  params: Promise<{ forumId: string }>;
 }) {
+  const resolvedParams = use(params);
   return (
     <ForumProvider>
-      <ForumPage params={params} />
+      <ForumPage params={resolvedParams} />
     </ForumProvider>
   );
 }
@@ -1729,7 +1730,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                               // Parse @mentions and make them clickable
                               const message = post.message;
                               const mentionRegex = /@(\w+)/g;
-                              const parts: (string | JSX.Element)[] = [];
+                              const parts: (string | React.JSX.Element)[] = [];
                               let lastIndex = 0;
                               let match;
 
