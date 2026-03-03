@@ -1,519 +1,207 @@
 // Test file for username content moderation
 // This can be run manually to test the content moderation functionality
+// Uses the same word-boundary regex as production (contentModeration.ts)
 
-const testUsernames = [
-  // Valid usernames (should pass)
-  "validUser123",
-  "test_user",
-  "user-name",
-  "gamer123",
-  "player_2024",
-  
-  // Invalid usernames (should be blocked)
-  'ejaculate',
-  'ejaculation',
-  'arsehead',
-  'arse',
-  'arsehole',
-  'asshat',
-  'assfart',
-  'shite',
-  'dumbass',
-  'dumb fuck',
-  'dyke',
-  'load of shit',
-  'full of shit',
-  'horseshit',
-  'dogshit',
-  'son of a bitch',
-  'son of a whore',
-  'prick',
-  'shit',
-  'shithead',
-  'fuck face',
-  'finger yourself',
-  'Satan',
-  'Nazi',
-  'Vladimir Putin',
-  'Kremlin',
-  'Putin',
-  'Pro-Putin',
-  'Pro-Russia',
-  'Benjamin Netanyahu',
-  'Viktor Orbán',
-  'Xi Jinping',
-  'Ayatollah Ali Khamenei',
-  'Ahmed al‑Sharaa',
-  'Adolf Hitler',
-  'Hitler',
-  'Augusto Pinochet',
-  'Alberto Fujimori',
-  'Lee Kuan Yew',
-  'Recep Tayyip Erdoğan',
-  'Boris Yeltsin',
-  'unified reich',
-  'Donald Trump',
-  'Trump',
-  'Trumpism',
-  'Trump2028',
-  'Make America Great Again',
-  'Maga',
-  'Mein Kampf',
-  'fascist',
-  'faggot',
-  'fuck',
-  'fuck you',
-  'fuck off',
-  'fuck me',
-  'fucking',
-  'bastard',
-  'spastic',
-  'retard',
-  'retarded',
-  'bitch',
-  'pussy',
-  'asshole',
+// Import the OFFENSIVE_WORDS list from contentModeration.ts by reading the file
+// Since this is a plain JS test, we hardcode a representative subset for testing.
+// The full list lives in utils/contentModeration.ts as the single source of truth.
+const OFFENSIVE_WORDS_SAMPLE = [
   'ass',
-  'anal',
-  'anus',
-  'dick',
-  'dickhead',
-  'cunt',
-  'penis',
-  'penal',
-  'scrotum',
-  'vagina',
-  'dildo',
-  'neo-nazi',
-  'proud boys',
-  'oathkeepers',
-  'Al Qaeda',
-  'Taliban',
-  'ISIS',
-  'Qatar',
-  'Osama Bin Laden',
-  'qanon',
-  'cum',
-  'cumming',
-  'Kim Jong Un',
-  'Hamas',
-  'Bashar al-Assad',
-  'Hayʼat Tahrir al-Sham',
-  'Hezbollah',
-  'Houthi',
-  'wanker',
-  'whore',
-  'white power',
-  'white supremacy',
-  'white supremacist',
-  'coon',
-  'cocksucker',
-  'nigga',
-  'nigger',
-  'Stalin',
-  'Hentai',
-  'porn',
-  'pornhub',
-  'pornography',
-  'pornographic',
-  'pedo',
-  'pedophile',
-  'kill yourself',
-  'kys',
-  'rape',
-  'rapist',
-  'raped',
-  'fucked',
-  'fucked up',
-  'motherfucker',
-  'motherfucking',
-  'J.D. Vance',
-  'Elon Musk',
-  'Tulsi Gabbard',
-  'Tucker Carlson',
-  'Jesse Watters',
-  'Kari Lake',
-  'Marco Rubio',
-  'Jeffrey Epstein',
-  'Ghislaine Maxwell',
-  'Rudy Giuliani',
-  'Linda McMahon',
-  'Chuck Grassley',
-  'Steve Bannon',
-  'Tim Scott',
-  'Niki Haley',
-  'Asa Hutchinson',
-  'Francis Suarez',
-  'Will Hurd',
-  'Perry Johnson',
-  'Vivek Ramaswamy',
-  'Kash Patel',
-  'Dan Bongino',
-  'Paul Dans',
-  'Winsome Earle-Sears',
-  'Mike Johnson',
-  'Kyle Rittenhouse',
-  'Rick Scott',
-  'Ron DeSantis',
-  'Casey DeSantis',
-  'Pam Bondi',
-  'Emil Bove',
-  'Pete Hegseth',
-  'Ted Cruz',
-  'Robert F. Kennedy Jr.',
-  'Byron Donalds',
-  'Russel Vought',
-  'Jon Voight',
-  'Marjorie Taylor Greene',
-  'Joe Wilson',
-  'Lauren Boebert',
-  'Matt Gaetz',
-  'Alice Johnson',
-  'Jim Jordan',
-  'Melania Trump',
-  'Donald Trump Jr.',
-  'Laura Trump',
-  'Eric Trump',
-  'Ivanka Trump',
-  'Mitch McConnell',
-  'Doug Burgum',
-  'Tom Homan',
-  'John Roberts',
-  'Amy Coney Barrett',
-  'Clarence Thomas',
-  'Lindsey Graham',
-  'Samuel Alito',
-  'Brett Kavanaugh',
-  'Neil Gorsuch',
-  'Aileen Cannon',
-  'Tommy Tuberville',
-  'Brandon Carr',
-  'Dr. Oz',
-  'Mehmet Oz',
-  'Julie Fedorchak',
-  'Greg Abbott',
-  'Enrique Tarrio',
-  'Steward Rhodes',
-  'Eric Adams',
-  'Brad Schimel',
-  'Katie Britt',
-  'Bernie Mareno',
-  'Tom Cotton',
-  'Gabe Evans',
-  'Rand Paul',
-  'Bill Cassidy',
-  'Markwayne Mullin',
-  'John Thune',
-  'Michael Todd Chrisley',
-  'Julie Chrisley',
-  'Kelly Ayotte',
-  'Larry Kudlow',
-  'John Barraso',
-  'Sarah Palin',
-  'Robert Aderholt',
-  'James Lankford',
-  'Steve Scalise',
-  'Kanye West',
-  'Bill Cosby',
-  'Ben Shapiro',
-  'Derek Chauvin',
-  'Karoline Leavitt',
-  'Dave McCormick',
-  'John Eastman',
-  'Kenneth Chesebro',
-  'Sidney Powell',
-  'Mark Meadows',
-  'Howard Lutnick',
-  'Mike Waltz',
-  'Tim Sheehy',
-  'John Ratcliffe',
-  'Steve Witkoff',
-  'Laura Loomer',
-  'Rush Limbaugh',
-  'Mike Kehoe',
-  'Brian Kemp',
-  'Alina Habba',
-  'Chip Roy',
-  'David Richardson',
-  'Kristi Noem',
-  'Elise Stefanik',
-  'Boris Epstein',
-  'Ed Martin',
-  'Sean Duffy',
-  'Jim Banks',
-  'Susan Collins',
-  'Robert Giuffra',
-  'Mike Lindell',
-  'Harmeet Dhillon',
-  'Ryan Walters',
-  'Felix Barry Moore',
-  'Jeanine Pirro',
-  'J. K. Rowling',
-  'Mike Haridopolos',
-  'Josh Hawley',
-  'Derek Schmidt',
-  'Jefferson Shreve',
-  'Mike Lee',
-  'John Kennedy',
-  'Craig Goldman',
-  'Derrick Van Orden',
-  'Jeff Bezos',
-  'Scott Bessent',
-  'John Curtis',
-  'Lisa McClain',
-  'Brooke Rollins',
-  'Dabney Friedrich',
-  'Jeff Sessions',
-  'Richard Hudson Jr.',
-  'Andrea Lucas',
-  'Mike Flood',
-  'Kelly Armstrong',
-  'Devin Nunes',
-  'Hulk Hogan',
-  'Kevin Roberts',
-  'Mike Braun',
-  'Rodney Scott',
-  'Steve Moore',
-  'Jeffrey Crank',
-  'Robert Wolf',
-  'Andrew Puzder',
-  'Joshua Divine',
-  'Salvatore Cordileone',
-  'Vance Boelter',
-  'Charlie Kirk',
-  'Kevin Stitt',
-  'Paul Szypula',
-  'Bill Hagerty',
-  'Jeff Landry',
-  'Nick Sortor',
-  'Haile McAnally',
-  'Thom Tillis',
-  'Joe Lombardo',
-  'Kevin Kiley',
-  'Anna Paulina',
-  'Stephen Miller',
-  'Jason Smith',
-  'John Sauer',
-  'Zach Rehl',
-  'Jessica Watkins',
-  'Kenneth Harrelson',
-  'Kyle Young',
-  'James Ho',
-  'Don Willett',
-  'Henry McMaster',
-  'Larry Rhoden',
-  'Ashley Moody',
-  'Mike DeWine',
-  'Robert Morss',
-  'Kelly Meggs',
-  'Greg Gutfeld',
-  'Joseph Hackett',
-  'Gary Palmer',
-  'Dominic Pezzola',
-  'Tim Hale',
-  'Sean Combs',
-  'Dustin Burrows',
-  'Bret Baier',
-  'Marlin Stutzman',
-  'Elliot Gaiser',
-  'Dale Strong',
-  'Joni Ernst',
-  'Andy Harris',
-  'Nancy Mace',
-  'Bruce Westerman',
-  'Brendan Carr',
-  'John Cornyn',
-  'Sarah Huckabee Sanders',
-  'Gregory Katsas',
-  'Justin Walker',
-  'Steve Womack',
-  'Alex Stein',
-  'Tate Reeves',
-  'Greg Gianforte',
-  'Jeffrey Wall',
-  'Marsha Blackburn',
-  'Bill Lee',
-  'Tony Fabrizio',
-  'Markwayne Mullin',
-  'Kay Ivey',
-  'Jim Pellin',
-  'Debra Fischer',
-  'Jon Husted',
-  'Sheri Biggs',
-  'Chris LaCivita',
-  'Jimmy Patronis Jr.',
-  'Randy Fine',
-  'Shelley Moore Capito',
-  'James Comer',
-  'Glenn Youngkin',
-  'Phil McGraw',
-  'Bryan Steil',
-  'Virginia Foxx',
-  'Rick Snyder',
-  'Mike Rogers',
-  'Addison McDowell',
-  'John Boozman',
-  'Nick Begich III',
-  'Brad Little',
-  'Mark Gordon',
-  'Phil Scott',
-  'Spencer Cox',
-  'Kim Reynolds',
-  'Ashley Moore',
-  'Patrick Harrigan',
-  'Jim Justice',
-  'Thomas Barrett',
-  'David Valadao',
-  'Kandiss Taylor',
-  'James Murphy',
-  'Scott Mayer',
-  'Ryan Mackenzie',
-  'Rob Bresnahan',
-  'Jordan Emery Pratt',
-  'Laura Ingraham',
-  'Troy Downing',
-  'Sean Hannity',
-  'Glenn Beck',
-  'Charlie Hurt',
-  'Mike Dunleavy',
-  'Joe Rogan',
-  'Alex Jones',
-  'Liz Wheeler',
-  'Megyn Kelly',
-  'Bryan Kohberger',
+  'asshole',
+  'shit',
+  'fuck',
   'Robert Durst',
   'Ted Bundy',
-  'herpes',
-  'genitalia',
-  'genitals',
-  'sex trafficking',
-  'kiss my ass',
-  'suck my dick',
-  'eat a dick',
-  'blew my load',
-  'blewmyload',
-  'titty fuck',
-  'titty',
-  'nipples',
-  'paizuri',
-  'shotacon',
-  'butt plug',
-  'buttplug',
-  'Ku Klux Klan',
+  'Nick Begich III',
+  'Richard Hudson Jr.',
+  'Robert F. Kennedy Jr.',
+  'Jimmy Patronis Jr.',
+  'Rob Bresnahan Jr.',
+  'Donald Trump Jr.',
+  'Christopher S. Ripley',
+  'Winsome Earle-Sears',
+  'J.D. Vance',
+  'J. K. Rowling',
+  'Dr. Oz',
+  'Trump',
+  'cum',
   'KKK',
-  'Department of Government Effeciency',
-  'Lynching',
-  'buttlicker',
-  'jizz',
-  'cumshot',
-  'blowjob',
-  'titties',
-  'titjob',
-  'handjob',
-  'thighjob',
-  'footjob',
-  'cunnilingus',
-  'butt fuck',
-  'buttfuck',
-  'bitch tits',
-  'bitch ass',
-  'masterbate',
-  'masterbating',
-  'masterbated',
-  'horny',
-  'horny bitch',
-  'slut',
-  'slutty',
-  'Bollocks',
-  'bollocks',
-  'cumdumpster',
-  'cum dumpster',
-  'testicles',
-  'neek',
-  'twat',
-  'gooning',
-  'buttfucker',
-  'butt fucker',
-  'buttfucked',
-  'butt fucked',
-  'pussy hole',
-  'blow me',
-  'blowme',
-  'Children\'s Health Defense',
-  'Medical Ethics Defense Act',
-  'The Federalist Society',
-  'Heritage Foundation',
-  'Fox News',
-  'One America News Network',
-  'Project 2025',
-  'National Socialist Movement',
-  'Order of the Black Sun',
-  'Blood Tribe',
-  'Patriot Front',
-  'Atomwaffen Division',
-  'Phyllis Schlafly Eagles',
-  'Religious Liberty Commission'
+  'Putin',
 ];
 
-console.log("Username Content Moderation Test");
-console.log("=================================");
-console.log("This test checks if usernames would be blocked by content moderation");
-console.log("");
-
-// Test function to simulate the content moderation check
-function testUsername(username) {
-  const OFFENSIVE_WORDS = [
-    'ejaculate', 'ejaculation', 'arsehead', 'arse', 'arsehole', 'asshat', 'assfart', 'shite', 'dumbass', 'dumb fuck', 'dyke', 'load of shit', 'full of shit', 'horseshit', 'dogshit', 'son of a bitch', 'son of a whore', 'prick', 'shit', 'shithead', 'fuck face', 'finger yourself', 'Satan', 'Nazi', 'Vladimir Putin', 'Kremlin', 'Putin', 'Pro-Putin', 'Pro-Russia', 'Benjamin Netanyahu', 'Viktor Orbán', 'Xi Jinping', 'Ayatollah Ali Khamenei', 'Ahmed al‑Sharaa', 'Adolf Hitler', 'Hitler', 'Augusto Pinochet', 'Alberto Fujimori', 'Lee Kuan Yew', 'Recep Tayyip Erdoğan', 'Boris Yeltsin', 'unified reich', 'Donald Trump', 'Trump', 'Trumpism', 'Trump2028', 'Make America Great Again', 'Maga', 'Mein Kampf', 'fascist', 'faggot', 'fuck', 'fuck you', 'fuck off', 'fuck me', 'fucking', 'bastard', 'spastic', 'retard', 'retarded', 'bitch', 'pussy', 'asshole', 'ass', 'anal', 'anus', 'dick', 'dickhead', 'cunt', 'penis', 'penal', 'scrotum', 'vagina', 'dildo', 'neo-nazi', 'proud boys', 'oathkeepers', 'Al Qaeda', 'Taliban', 'ISIS', 'Qatar', 'Osama Bin Laden', 'qanon', 'cum', 'cumming', 'Kim Jong Un', 'Hamas', 'Bashar al-Assad', 'Hayʼat Tahrir al-Sham', 'Hezbollah', 'Houthi', 'wanker', 'whore', 'white power', 'white supremacy', 'white supremacist', 'coon', 'cocksucker', 'nigga', 'nigger', 'Stalin', 'Hentai', 'porn', 'pornhub', 'pornography', 'pornographic', 'pedo', 'pedophile', 'kill yourself', 'kys', 'rape', 'rapist', 'raped', 'fucked', 'fucked up', 'motherfucker', 'motherfucking', 'J.D. Vance', 'Elon Musk', 'Tulsi Gabbard', 'Tucker Carlson', 'Jesse Watters', 'Kari Lake', 'Marco Rubio', 'Jeffrey Epstein', 'Ghislaine Maxwell', 'Rudy Giuliani', 'Linda McMahon', 'Chuck Grassley', 'Steve Bannon', 'Tim Scott', 'Niki Haley', 'Asa Hutchinson', 'Francis Suarez', 'Will Hurd', 'Perry Johnson', 'Vivek Ramaswamy', 'Kash Patel', 'Dan Bongino', 'Paul Dans', 'Winsome Earle-Sears', 'Mike Johnson', 'Kyle Rittenhouse', 'Rick Scott', 'Ron DeSantis', 'Casey DeSantis', 'Pam Bondi', 'Emil Bove', 'Pete Hegseth', 'Ted Cruz', 'Robert F. Kennedy Jr.', 'Byron Donalds', 'Russel Vought', 'Jon Voight', 'Marjorie Taylor Greene', 'Joe Wilson', 'Lauren Boebert', 'Matt Gaetz', 'Alice Johnson', 'Jim Jordan', 'Melania Trump', 'Donald Trump Jr.', 'Laura Trump', 'Eric Trump', 'Ivanka Trump', 'Mitch McConnell', 'Doug Burgum', 'Tom Homan', 'John Roberts', 'Amy Coney Barrett', 'Clarence Thomas', 'Lindsey Graham', 'Samuel Alito', 'Brett Kavanaugh', 'Neil Gorsuch', 'Aileen Cannon', 'Tommy Tuberville', 'Brandon Carr', 'Dr. Oz', 'Mehmet Oz', 'Greg Abbott', 'Enrique Tarrio', 'Steward Rhodes', 'Eric Adams', 'Brad Schimel', 'Katie Britt', 'Tom Cotton', 'Rand Paul', 'Bill Cassidy', 'Markwayne Mullin', 'John Thune', 'Michael Todd Chrisley', 'Julie Chrisley', 'Larry Kudlow', 'John Barraso', 'Sarah Palin', 'James Lankford', 'Steve Scalise', 'Kanye West', 'Bill Cosby', 'Ben Shapiro', 'Derek Chauvin', 'Karoline Leavitt', 'John Eastman', 'Kenneth Chesebro', 'Sidney Powell', 'Mark Meadows', 'Howard Lutnick', 'Mike Waltz', 'John Ratcliffe', 'Steve Witkoff', 'Laura Loomer', 'Rush Limbaugh', 'Alina Habba', 'Chip Roy', 'David Richardson', 'Kristi Noem', 'Elise Stefanik', 'Boris Epstein', 'Ed Martin', 'Sean Duffy', 'Susan Collins', 'Robert Giuffra', 'Mike Lindell', 'Harmeet Dhillon', 'Ryan Walters', 'Jeanine Pirro', 'J. K. Rowling', 'Josh Hawley', 'Mike Lee', 'John Kennedy', 'Derrick Van Orden', 'Jeff Bezos', 'Scott Bessent', 'Lisa McClain', 'Brooke Rollins', 'Dabney Friedrich', 'Jeff Sessions', 'Andrea Lucas', 'Mike Flood', 'Devin Nunes', 'Kevin Roberts', 'Rodney Scott', 'Steve Moore', 'Robert Wolf', 'Andrew Puzder', 'Joshua Divine', 'Salvatore Cordileone', 'Vance Boelter', 'Charlie Kirk', 'Paul Szypula', 'Bill Hagerty', 'Nick Sortor', 'Haile McAnally', 'Thom Tillis', 'Kevin Kiley', 'Anna Paulina', 'Stephen Miller', 'Jason Smith', 'John Sauer', 'Zach Rehl', 'Jessica Watkins', 'Kenneth Harrelson', 'Kyle Young', 'James Ho', 'Don Willett', 'Ashley Moody', 'Mike DeWine', 'Robert Morss', 'Kelly Meggs', 'Greg Gutfeld', 'Joseph Hackett', 'Dominic Pezzola', 'Tim Hale', 'Sean Combs', 'Dustin Burrows', 'Bret Baier', 'Elliot Gaiser', 'Joni Ernst', 'Andy Harris', 'Nancy Mace', 'Brendan Carr', 'John Cornyn', 'Sarah Huckabee Sanders', 'Gregory Katsas', 'Justin Walker', 'Alex Stein', 'Jeffrey Wall', 'Marsha Blackburn', 'Tony Fabrizio', 'Markwayne Mullin', 'Debra Fischer', 'Jon Husted', 'Chris LaCivita', 'Jimmy Patronis Jr.', 'Randy Fine', 'Shelley Moore Capito', 'James Comer', 'Phil McGraw', 'Bryan Steil', 'Virginia Foxx', 'Rick Snyder', 'Mike Rogers', 'John Boozman', 'Ashley Moore', 'Jim Justice', 'David Valadao', 'Kandiss Taylor', 'James Murphy', 'Scott Mayer', 'Jordan Emery Pratt', 'Laura Ingraham', 'Sean Hannity', 'Glenn Beck', 'Charlie Hurt', 'Joe Rogan', 'Alex Jones', 'Liz Wheeler', 'Megyn Kelly', 'Bryan Kohberger', 'Robert Durst', 'Ted Bundy', 'herpes', 'genitalia', 'genitals', 'sex trafficking', 'kiss my ass', 'suck my dick', 'eat a dick', 'blew my load', 'blewmyload', 'titty fuck', 'titty', 'nipples', 'paizuri', 'shotacon', 'butt plug', 'buttplug', 'Ku Klux Klan', 'KKK', 'Department of Government Effeciency', 'Lynching', 'buttlicker', 'jizz', 'cumshot', 'blowjob', 'titties', 'titjob', 'handjob', 'thighjob', 'footjob', 'cunnilingus', 'butt fuck', 'buttfuck', 'bitch tits', 'bitch ass', 'masterbate', 'masterbating', 'masterbated', 'horny', 'horny bitch', 'slut', 'slutty', 'Bollocks', 'bollocks', 'cumdumpster', 'cum dumpster', 'testicles', 'neek', 'twat', 'gooning', 'buttfucker', 'butt fucker', 'buttfucked', 'butt fucked', 'pussy hole', 'blow me', 'blowme', 'Medical Ethics Defense Act', 'The Federalist Society', 'Heritage Foundation', 'Fox News', 'One America News Network', 'Project 2025', 'National Socialist Movement', 'Order of the Black Sun', 'Blood Tribe', 'Patriot Front', 'Atomwaffen Division', 'Phyllis Schlafly Eagles', 'Religious Liberty Commission', 'Children\'s Health Defense', 'Mike Dunleavy', 'Rob Bresnahan', 'Troy Downing', 'Ryan Mackenzie', 'Thomas Barrett', 'Patrick Harrigan', 'Kim Reynolds', 'Spencer Cox', 'Phil Scott', 'Mark Gordon', 'Brad Little', 'Nick Begich III', 'Addison McDowell', 'Glenn Youngkin', 'Sheri Biggs', 'Jim Pellin', 'Kay Ivey', 'Greg Gianforte', 'Tate Reeves', 'Steve Womack', 'Bruce Westerman', 'Dale Strong', 'Marlin Stutzman', 'Gary Palmer', 'Larry Rhoden', 'Henry McMaster', 'Joe Lombardo', 'Jeff Landry', 'Kevin Stitt', 'Jeffrey Crank', 'Mike Braun', 'Hulk Hogan', 'Kelly Armstrong', 'Richard Hudson Jr.', 'John Curtis', 'Craig Goldman', 'Jefferson Shreve', 'Derek Schmidt', 'Mike Haridopolos', 'Felix Barry Moore', 'Jim Banks', 'Brian Kemp', 'Mike Kehoe', 'Tim Sheehy', 'Dave McCormick', 'Robert Aderholt', 'Kelly Ayotte', 'Gabe Evans', 'Bernie Mareno', 'Julie Fedorchak', 'Corey Lewandowski', 'Dean Cain', 'Ken Paxton', 'Miley Biggs', 'Aligator Alcatraz', 'Doug Collins'
-  ];
-
-  const lowercaseUsername = username.toLowerCase();
-  const foundWords = OFFENSIVE_WORDS.filter(word => 
-    lowercaseUsername.includes(word.toLowerCase())
-  );
+/**
+ * Check if content matches any offensive word using the same regex
+ * as production (contentModeration.ts).
+ *
+ * Uses (?<!\w) and (?!\w) instead of \b so entries ending with
+ * non-word characters (e.g. "Jr.") are still caught correctly.
+ */
+function checkContent(content) {
+  const foundWords = OFFENSIVE_WORDS_SAMPLE.filter(word => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
+    return regex.test(content);
+  });
 
   return {
-    username,
+    content,
     isOffensive: foundWords.length > 0,
     offendingWords: foundWords
   };
 }
 
-// Run tests
+// ─── Test harness ───────────────────────────────────────────────
+
 let passedTests = 0;
 let failedTests = 0;
 
-testUsernames.forEach((username, index) => {
-  const result = testUsername(username);
-  
-  if (index < 5) {
-    // First 5 are valid usernames
-    if (result.isOffensive) {
-      console.log(`❌ FAIL: "${username}" should be valid but was flagged as offensive`);
-      failedTests++;
-    } else {
-      console.log(`✅ PASS: "${username}" is correctly valid`);
-      passedTests++;
-    }
+function expectBlocked(input, reason) {
+  const result = checkContent(input);
+  if (result.isOffensive) {
+    console.log(`  PASS (blocked): "${input}" -- ${reason}`);
+    passedTests++;
   } else {
-    // Rest are invalid usernames
-    if (result.isOffensive) {
-      console.log(`✅ PASS: "${username}" is correctly flagged as offensive`);
-      passedTests++;
-    } else {
-      console.log(`❌ FAIL: "${username}" should be offensive but was not flagged`);
-      failedTests++;
-    }
+    console.log(`  FAIL (should be blocked): "${input}" -- ${reason}`);
+    failedTests++;
   }
-});
+}
 
+function expectAllowed(input, reason) {
+  const result = checkContent(input);
+  if (!result.isOffensive) {
+    console.log(`  PASS (allowed): "${input}" -- ${reason}`);
+    passedTests++;
+  } else {
+    console.log(`  FAIL (should be allowed but blocked by: ${result.offendingWords.join(', ')}): "${input}" -- ${reason}`);
+    failedTests++;
+  }
+}
+
+// ─── Tests ──────────────────────────────────────────────────────
+
+console.log("Username Content Moderation Test");
+console.log("=================================");
 console.log("");
+
+// 1. Basic offensive words still blocked
+console.log("1. Basic offensive words (should be BLOCKED):");
+expectBlocked('fuck', 'exact match');
+expectBlocked('FUCK', 'case-insensitive');
+expectBlocked('shit', 'exact match');
+expectBlocked('asshole', 'exact match');
+expectBlocked('KKK', 'abbreviation');
+console.log("");
+
+// 2. Substring safety — no false positives
+console.log("2. Substring safety (should be ALLOWED):");
+expectAllowed('grass', '"ass" is inside but not a whole word');
+expectAllowed('class', '"ass" is inside but not a whole word');
+expectAllowed('classic', '"ass" is inside but not a whole word');
+expectAllowed('document', 'no offensive substring');
+expectAllowed('assume', '"ass" is a prefix but not standalone');
+expectAllowed('cumbersome', '"cum" is a prefix but not standalone');
+expectAllowed('accumulated', '"cum" is inside but not standalone');
+console.log("");
+
+// 3. Full-name matching — only full names blocked
+console.log("3. Full-name matching (should be BLOCKED):");
+expectBlocked('Robert Durst', 'exact full name');
+expectBlocked('robert durst', 'case-insensitive full name');
+expectBlocked('Nick Begich III', 'full name with numeral');
+expectBlocked('Christopher S. Ripley', 'full name with middle initial');
+expectBlocked('Winsome Earle-Sears', 'full name with hyphen');
+expectBlocked('J.D. Vance', 'full name with periods');
+expectBlocked('J. K. Rowling', 'full name with spaced initials');
+expectBlocked('Dr. Oz', 'name with title prefix');
+console.log("");
+
+// 4. First names only — should NOT match full-name entries
+console.log("4. First names only (should be ALLOWED):");
+expectAllowed('Robert', 'first name only, not "Robert Durst"');
+expectAllowed('Nick', 'first name only, not "Nick Begich III"');
+expectAllowed('Christopher', 'first name only, not "Christopher S. Ripley"');
+expectAllowed('Winsome', 'first name only, not "Winsome Earle-Sears"');
+expectAllowed('Ted', 'first name only, not "Ted Bundy"');
+expectAllowed('Jimmy', 'first name only, not "Jimmy Patronis Jr."');
+expectAllowed('Richard', 'first name only, not "Richard Hudson Jr."');
+expectAllowed('Rob', 'first name only, not "Rob Bresnahan Jr."');
+console.log("");
+
+// 5. Last names only — should NOT match full-name entries
+console.log("5. Last names only (should be ALLOWED):");
+expectAllowed('Durst', 'last name only');
+expectAllowed('Begich', 'last name only');
+expectAllowed('Ripley', 'last name only');
+expectAllowed('Bundy', 'last name only');
+expectAllowed('Vance', 'last name only');
+expectAllowed('Rowling', 'last name only');
+expectAllowed('Oz', 'last name only');
+console.log("");
+
+// 6. Roman numerals / suffixes NOT causing false positives
+console.log("6. Names with numerals / suffixes (should be ALLOWED):");
+expectAllowed('Stanley Sherman IV', 'different person with Roman numeral');
+expectAllowed('Victory III', 'non-name use of Roman numeral');
+expectAllowed('Henry VIII', 'historical numeral');
+expectAllowed('King James III', 'different name with same numeral');
+expectAllowed('III', 'bare numeral alone');
+expectAllowed('IV', 'bare numeral alone');
+console.log("");
+
+// 7. Jr. / Sr. NOT causing false positives
+console.log("7. Jr. / Sr. suffixes (should be ALLOWED):");
+expectAllowed('Sr. Knight', '"Sr." not part of any listed name');
+expectAllowed('Jr. Smith', '"Jr." not part of any listed name');
+expectAllowed('Martin Luther King Jr.', 'different person with Jr.');
+expectAllowed('Hudson', 'last name only, not "Richard Hudson Jr."');
+expectAllowed('Patronis', 'last name only, not "Jimmy Patronis Jr."');
+expectAllowed('Bresnahan', 'last name only, not "Rob Bresnahan Jr."');
+console.log("");
+
+// 8. Names ending with "Jr." ARE correctly blocked
+console.log("8. Names ending with Jr. (should be BLOCKED):");
+expectBlocked('Robert F. Kennedy Jr.', 'full name with Jr. period');
+expectBlocked('Richard Hudson Jr.', 'full name with Jr. period');
+expectBlocked('Jimmy Patronis Jr.', 'full name with Jr. period');
+expectBlocked('Rob Bresnahan Jr.', 'full name with Jr. period');
+expectBlocked('Donald Trump Jr.', 'full name with Jr. period');
+console.log("");
+
+// 9. Hyphenated names
+console.log("9. Hyphenated names:");
+expectBlocked('Winsome Earle-Sears', 'full hyphenated name blocked');
+expectAllowed('Earle-Sears', 'partial hyphenated name allowed');
+expectAllowed('Earle', 'single part of hyphenated name allowed');
+expectAllowed('Sears', 'single part of hyphenated name allowed');
+console.log("");
+
+// 10. Middle initial / period names
+console.log("10. Names with middle initials / periods:");
+expectBlocked('Christopher S. Ripley', 'full name with middle initial');
+expectAllowed('Christopher Ripley', 'missing middle initial, different match');
+expectAllowed('S. Ripley', 'partial name allowed');
+console.log("");
+
+// 11. Valid usernames
+console.log("11. Valid usernames (should be ALLOWED):");
+expectAllowed('validUser123', 'normal username');
+expectAllowed('test_user', 'underscore username');
+expectAllowed('user-name', 'hyphenated username');
+expectAllowed('gamer123', 'alphanumeric username');
+expectAllowed('player_2024', 'year in username');
+expectAllowed('xXDarkKnightXx', 'gaming-style username');
+expectAllowed('JohnSmith42', 'real-name-style username');
+console.log("");
+
+// ─── Results ────────────────────────────────────────────────────
+
 console.log("Test Results:");
-console.log(`✅ Passed: ${passedTests}`);
-console.log(`❌ Failed: ${failedTests}`);
-console.log(`Total: ${passedTests + failedTests}`);
+console.log(`  Passed: ${passedTests}`);
+console.log(`  Failed: ${failedTests}`);
+console.log(`  Total:  ${passedTests + failedTests}`);
 
 if (failedTests === 0) {
-  console.log("🎉 All tests passed! Content moderation is working correctly.");
+  console.log("\nAll tests passed! Content moderation is working correctly.");
 } else {
-  console.log("⚠️  Some tests failed. Please review the content moderation implementation.");
+  console.log("\nSome tests failed. Please review the content moderation implementation.");
 } 

@@ -173,6 +173,7 @@ const OFFENSIVE_WORDS = [
   'Laura Trump',
   'Eric Trump',
   'Ivanka Trump',
+  'Barron Trump',
   'Mitch McConnell',
   'Doug Burgum',
   'Tom Homan',
@@ -333,6 +334,7 @@ const OFFENSIVE_WORDS = [
   'Marlin Stutzman',
   'Elliot Gaiser',
   'Dale Strong',
+  'Michael Whatley',
   'Joni Ernst',
   'Andy Harris',
   'Nancy Mace',
@@ -370,6 +372,7 @@ const OFFENSIVE_WORDS = [
   'James Comey',
   'Glenn Youngkin',
   'Phil McGraw',
+  'Michele Morrow',
   'Bryan Steil',
   'Virginia Foxx',
   'Rick Snyder',
@@ -486,6 +489,7 @@ const OFFENSIVE_WORDS = [
   'Let\'s Go Brandon',
   'Truth Social',
   'Young Republicans',
+  'Immigration Customs Enforcement',
   'Children\'s Health Defense',
   'Medical Ethics Defense Act',
   'The Federalist Society',
@@ -511,9 +515,10 @@ export const containsOffensiveContent = async (content: string, userId: string) 
   // First do a quick local check using word boundaries to match whole words only
   const lowercaseContent = content.toLowerCase();
   const foundWords = OFFENSIVE_WORDS.filter(word => {
-    // Use word boundary regex to match whole words only, not substrings
-    // This prevents "class" from matching "ass" or "grass" from matching "ass"
-    const wordBoundaryRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // (?<!\w) and (?!\w) act like \b but also work when the entry starts/ends
+    // with a non-word character (e.g. "Jr." ending with a period).
+    const wordBoundaryRegex = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
     return wordBoundaryRegex.test(content);
   });
 
