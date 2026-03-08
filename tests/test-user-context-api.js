@@ -1,6 +1,6 @@
 /**
  * Simple test script for user-context API endpoint
- * Run with: node test-user-context-api.js YOUR_USERNAME
+ * Run with: node tests/test-user-context-api.js YOUR_USERNAME
  */
 
 const http = require('http');
@@ -9,7 +9,7 @@ const username = process.argv[2];
 
 if (!username) {
   console.error('❌ Please provide a username as an argument');
-  console.log('Usage: node test-user-context-api.js YOUR_USERNAME');
+  console.log('Usage: node tests/test-user-context-api.js YOUR_USERNAME');
   process.exit(1);
 }
 
@@ -106,4 +106,3 @@ req.setTimeout(5000, () => {
   console.error('❌ Request timeout (5s)');
   console.log('💡 Make sure the server is running and accessible\n');
 });
-
