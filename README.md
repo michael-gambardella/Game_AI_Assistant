@@ -170,6 +170,20 @@ The script will send multiple informational embeds covering:
     └── Question.ts        # Chat history schema
 ```
 
+## 🧹 Maintenance & Cleanup Notes
+
+- **Tests**
+  - Automated / manual test scripts live in `tests/` and are referenced from `package.json` where required (for example, `testDatabaseConnections.ts` via `npm run test:db`).
+  - Testing checklists and QA procedures are consolidated in `docs/testing/TESTING.md` (with `docs/testing/README.md` as an index).
+- **Scripts**
+  - Operational and QA helper scripts live under `scripts/` (for example, `clean-next-build.js`, `test-security-headers.js`, `test-token-blacklist.js`) and are safe to keep; they are either wired to npm scripts or useful one-off tools.
+- **Dev-only API routes**
+  - Historical ad-hoc API test routes (for Twitch bot, automated users, and helper tests) have been removed from `pages/api/` to keep the production surface clean.
+  - If you add new dev-only routes, prefer grouping them under a clearly named path (for example, `pages/api/_dev/`) and removing them before production deploys.
+- **Docs**
+  - High-level project documentation is this `README.md`.
+  - Deeper structure/cleanup notes that used to live in `PROJECT_STRUCTURE_ANALYSIS.md` are now summarized in this section; the separate file has been removed to reduce top-level clutter.
+
 ## 🎯 Pro Features
 
 Upgrade to Video Game Wingman Pro to unlock:
