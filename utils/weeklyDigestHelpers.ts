@@ -519,12 +519,21 @@ export async function getWeeklyGameRecommendations(
         }
       }
 
-      // Absolute fallback
+      // Absolute fallback: rotate through a diverse genre pool weekly per user
+      // This ensures different game recommendations each week instead of always the same genres
       if (primaryGenres.length === 0) {
-        primaryGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter',
+        const allFallbackGenres = [
+          'Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter',
           'Platformer', 'Puzzle', 'Fighting', 'Sports', 'Horror', 'Stealth', 'Simulation',
           'Survival', 'Rhythm', 'Sandbox', 'Shoot em Up', 'Battle Royale',
-          'Visual Novel', 'Beat Em Up', 'Trivia', 'MOBA', 'MMORPG', 'Roguelike'];
+          'Visual Novel', 'Beat Em Up', 'Trivia', 'MOBA', 'MMORPG', 'Roguelike'
+        ];
+        // Rotate start position based on current week + username so different genres are tried each week
+        const wn = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+        const uh = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const offset = (wn * 3 + uh) % allFallbackGenres.length;
+        const rotated = [...allFallbackGenres.slice(offset), ...allFallbackGenres.slice(0, offset)];
+        primaryGenres = rotated.slice(0, 6);
       }
     }
 
@@ -604,29 +613,26 @@ export async function getWeeklyGameRecommendations(
       // are treated as the same series and won't appear together in the same email
       // Exception: If the game had a colon with "Episode", keep the number (already extracted above)
       if (!hadColonWithEpisode) {
-        // Check if the series ends with a number
-        const endsWithNumber = /\s+\d+$/.test(series);
+        // Strip "Part N" or "Part [Roman numeral]" suffix first
+        // e.g., "The Last of Us Part II" → "The Last of Us", "Half Life 2 Part 1" → "Half Life 2"
+        const withoutPart = series.replace(/\s+Part\s+[IVXLCDM\d]+$/i, '').trim();
+        if (withoutPart.length > 0) {
+          series = withoutPart;
+        }
 
-        if (endsWithNumber) {
-          // Extract the base name (without the number) to check its length
-          const baseName = series.replace(/\s+\d+$/, '').trim();
-          // Count words in base name (split by space or hyphen)
-          const wordCount = baseName.split(/[\s-]+/).filter(w => w.length > 0).length;
+        // Always remove trailing numbers to treat sequels as the same series
+        // e.g., "Portal 2" → "Portal", "Halo 3" → "Halo", "Forza Horizon 5" → "Forza Horizon"
+        // This prevents same-series games from appearing in the same email
+        const withoutNumber = series.replace(/\s+\d+$/, '').trim();
+        if (withoutNumber.length > 0) {
+          series = withoutNumber;
+        }
 
-          // Heuristic: Keep numbers for short series names (1-2 words) that might have episodes
-          // Examples: "Half-Life 2" (2 words) → keep "2" to match with "Half-Life 2: Episode One"
-          //           "Doom 2" (1 word) → keep "2" (might have episodes)
-          // Remove numbers for longer series (likely sequels like "Super Mario Galaxy 2")
-          if (wordCount <= 2) {
-            // Keep the number - might have episodes, so keep it to match with episode games
-            // Don't remove it
-          } else {
-            // Longer series name - likely a sequel, remove the number
-            series = baseName;
-          }
-        } else {
-          // Doesn't end with number, so remove Roman numerals
-          series = series.replace(/\s+[IVXLCDM]+$/i, ''); // Remove trailing Roman numerals
+        // Remove trailing Roman numerals
+        // e.g., "Final Fantasy IX" → "Final Fantasy", "Resident Evil VII" → "Resident Evil"
+        const withoutRoman = series.replace(/\s+[IVXLCDM]+$/i, '').trim();
+        if (withoutRoman.length > 0) {
+          series = withoutRoman;
         }
       }
       // If it had a colon with Episode, we keep the number (e.g., "Half-Life 2: Episode One" → "Half-Life 2")
