@@ -105,7 +105,13 @@ export async function initializeTwitchBot(): Promise<boolean> {
         const { refreshBotToken, updateBotTokenAndReconnect } = await import('./twitchBotTokenRefresh');
         const refreshResult = await refreshBotToken(refreshToken);
         await updateBotTokenAndReconnect(refreshResult.accessToken, refreshResult.refreshToken);
-        
+
+        // If updateBotTokenAndReconnect already initialized the bot, don't double-initialize
+        if (isInitialized && client && botHandler) {
+          console.log('✅ Token refreshed successfully. Bot already connected via refresh handler.');
+          return true;
+        }
+
         // Update the token variable with the refreshed token
         botOAuthToken = process.env.TWITCH_BOT_OAUTH_TOKEN || botOAuthToken;
         console.log('✅ Token refreshed successfully. Retrying connection...');
