@@ -22,11 +22,25 @@ export function getOpenAIClient(): OpenAI {
     }
     openaiInstance = new OpenAI({
       apiKey: apiKey,
-      timeout: 28000, // 28 seconds - slightly under application timeout of 30s to allow for processing overhead
+      timeout: 28000, // Default for fast models; gpt-4o-search-preview uses a longer per-request timeout (see openaiRequestOptionsForModel)
       maxRetries: 1, // Reduce retries to avoid compounding delays
     });
   }
   return openaiInstance;
+}
+
+/** gpt-4o-search-preview runs browsing/search and often exceeds the default client timeout. */
+const OPENAI_SEARCH_PREVIEW_TIMEOUT_MS = 120_000;
+
+/**
+ * Per-request options for models that need more time. Avoids doubling wall-clock on timeout
+ * (SDK retries timeouts by default).
+ */
+export function openaiRequestOptionsForModel(model: string | undefined): { timeout: number; maxRetries: number } | undefined {
+  if (model === 'gpt-4o-search-preview') {
+    return { timeout: OPENAI_SEARCH_PREVIEW_TIMEOUT_MS, maxRetries: 0 };
+  }
+  return undefined;
 }
 
 // Cache implementation for API responses with LRU eviction
@@ -892,7 +906,10 @@ Provide only the game title. If you cannot identify it with confidence, respond 
         completionParams.temperature = 0.3; // Lower temperature for more consistent identification
       }
       
-      const completion = await getOpenAIClient().chat.completions.create(completionParams);
+      const reqOpts = openaiRequestOptionsForModel(modelSelection.model);
+      const completion = reqOpts
+        ? await getOpenAIClient().chat.completions.create(completionParams, reqOpts)
+        : await getOpenAIClient().chat.completions.create(completionParams);
 
       const identifiedGame = completion.choices[0].message.content?.trim();
       
@@ -1686,17 +1703,18 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
       // Track model usage
       modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
       
-      const completion = await getOpenAIClient().chat.completions.create({
+      const completionParams = {
         model: modelSelection.model,
         messages: [
-          { 
-            role: 'system', 
-            content: enhancedSystemMessage
-          },
-          { role: 'user', content: enhancedQuestion }
+          { role: 'system' as const, content: enhancedSystemMessage },
+          { role: 'user' as const, content: enhancedQuestion },
         ],
         max_completion_tokens: 800,
-      });
+      };
+      const reqOpts = openaiRequestOptionsForModel(modelSelection.model);
+      const completion = reqOpts
+        ? await getOpenAIClient().chat.completions.create(completionParams, reqOpts)
+        : await getOpenAIClient().chat.completions.create(completionParams);
 
       response = completion.choices[0].message.content;
     }
@@ -2015,20 +2033,24 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
           // Track model usage
           modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
           
-          const aiResponse = await getOpenAIClient().chat.completions.create({
+          const beginnerFilterParams = {
             model: modelSelection.model,
             messages: [
               {
-                role: 'system',
+                role: 'system' as const,
                 content: 'You are a gaming expert. Return only valid JSON arrays of game names.'
               },
               {
-                role: 'user',
+                role: 'user' as const,
                 content: aiPrompt
               }
             ],
             max_tokens: 500
-          });
+          };
+          const beginnerOpts = openaiRequestOptionsForModel(modelSelection.model);
+          const aiResponse = beginnerOpts
+            ? await getOpenAIClient().chat.completions.create(beginnerFilterParams, beginnerOpts)
+            : await getOpenAIClient().chat.completions.create(beginnerFilterParams);
 
           const aiText = aiResponse.choices[0]?.message?.content?.trim() || '';
           // Extract JSON array from response
@@ -2155,20 +2177,24 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
           // Track model usage
           modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
           
-          const aiResponse = await getOpenAIClient().chat.completions.create({
+          const popularFilterParams = {
             model: modelSelection.model,
             messages: [
               {
-                role: 'system',
+                role: 'system' as const,
                 content: 'You are a gaming expert with current knowledge. Return only valid JSON arrays of game names.'
               },
               {
-                role: 'user',
+                role: 'user' as const,
                 content: aiPrompt
               }
             ],
             max_tokens: 600
-          });
+          };
+          const popularOpts = openaiRequestOptionsForModel(modelSelection.model);
+          const aiResponse = popularOpts
+            ? await getOpenAIClient().chat.completions.create(popularFilterParams, popularOpts)
+            : await getOpenAIClient().chat.completions.create(popularFilterParams);
 
           const aiText = aiResponse.choices[0]?.message?.content?.trim() || '';
           // Extract JSON array from response
