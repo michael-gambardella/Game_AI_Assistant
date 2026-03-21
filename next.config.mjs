@@ -1,8 +1,14 @@
 // next.config.mjs
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Use this directory as the workspace root for output file tracing (avoids multiple lockfile warning)
+  outputFileTracingRoot: __dirname,
   // Security headers (fallback - middleware.ts is primary)
   // These are applied to static files and pages that middleware might miss
   // IMPORTANT: This is a fallback. Middleware.ts should be the primary source.

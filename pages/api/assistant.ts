@@ -471,6 +471,64 @@ const extractGameTitle = (question: string): string => {
   return match ? match[1].trim() : '';
 };
 
+// Deduplicate a list of game names by series, keeping only the first game per series.
+// Prevents sequels/prequels from appearing together (e.g., Portal + Portal 2).
+const deduplicateBySeries = (games: string[]): string[] => {
+  const extractSeriesName = (gameName: string): string => {
+    let series = gameName
+      .replace(/\s*\([^)]*\)/g, '')
+      .replace(/\s*Game\s+of\s+the\s+Year\s+Edition/gi, '')
+      .replace(/\s*Remastered/gi, '')
+      .replace(/\s*Remaster/gi, '')
+      .replace(/\s*Definitive\s+Edition/gi, '')
+      .replace(/\s*Enhanced\s+Edition/gi, '')
+      .replace(/\s*Ultimate\s+Edition/gi, '')
+      .replace(/\s*Deluxe\s+Edition/gi, '')
+      .replace(/\s*Complete\s+Edition/gi, '')
+      .trim();
+
+    // Handle "and the [subtitle]" pattern
+    const andTheMatch = series.match(/^(.+?)\s+and\s+the\s+/i);
+    if (andTheMatch) series = andTheMatch[1].trim();
+
+    // Handle colons: strip subtitle (keep base before colon)
+    // Exception: keep number when subtitle contains "Episode"
+    const colonIndex = series.indexOf(':');
+    let hadColonWithEpisode = false;
+    if (colonIndex > 0) {
+      const afterColon = series.substring(colonIndex + 1).trim();
+      if (/\bepisode\b/i.test(afterColon)) {
+        series = series.substring(0, colonIndex).trim();
+        hadColonWithEpisode = true;
+      } else {
+        series = series.substring(0, colonIndex).trim();
+      }
+    }
+
+    if (!hadColonWithEpisode) {
+      // Strip "Part N" / "Part [Roman]"
+      const withoutPart = series.replace(/\s+Part\s+[IVXLCDM\d]+$/i, '').trim();
+      if (withoutPart.length > 0) series = withoutPart;
+      // Strip trailing numbers (Portal 2 → Portal, Halo 3 → Halo)
+      const withoutNumber = series.replace(/\s+\d+$/, '').trim();
+      if (withoutNumber.length > 0) series = withoutNumber;
+      // Strip trailing Roman numerals (Final Fantasy IX → Final Fantasy)
+      const withoutRoman = series.replace(/\s+[IVXLCDM]+$/i, '').trim();
+      if (withoutRoman.length > 0) series = withoutRoman;
+    }
+
+    return (series.trim().replace(/\s+/g, ' ') || gameName).toLowerCase();
+  };
+
+  const seenSeries = new Set<string>();
+  return games.filter(game => {
+    const series = extractSeriesName(game);
+    if (seenSeries.has(series)) return false;
+    seenSeries.add(series);
+    return true;
+  });
+};
+
 // Function to determine question category for achievement tracking
 export const checkQuestionType = (question: string): string[] => {
   const lowerQuestion = question.toLowerCase();
@@ -1663,7 +1721,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         );
 
         if (recommendations.length > 0) {
-          const gameList = recommendations.slice(0, 5).join(', ');
+          const gameList = deduplicateBySeries(recommendations).slice(0, 5).join(', ');
           if (isForBeginners) {
             return `Here are some great ${detectedGenre.toLowerCase()} games for beginners: ${gameList}. These games are known for being accessible and fun for players new to the genre. Would you like to know more about any of these games?`;
           } else if (isCurrentPopular) {
@@ -1696,7 +1754,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           const cacheKey = `recommendations:new-user:default`;
           const recommendations = await deduplicateRequest(cacheKey, () => fetchRecommendations('Action-Adventure'));
           return recommendations.length > 0
-            ? `Since you're new here, here are some great games to get started: ${recommendations.slice(0, 3).join(', ')}. Feel free to ask me about any game you're interested in!`
+            ? `Since you're new here, here are some great games to get started: ${deduplicateBySeries(recommendations).slice(0, 3).join(', ')}. Feel free to ask me about any game you're interested in!`
             : "I'd love to help you find a game! What types of games do you enjoy? Action, RPG, strategy, or something else?";
         }
 
@@ -1820,7 +1878,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         const recommendations = genres.length > 0 ? await deduplicateRequest(cacheKey, () => fetchRecommendations(genres[0])) : [];
 
         return recommendations.length > 0
-          ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.`
+          ? `Based on your previous questions, I recommend these games: ${deduplicateBySeries(recommendations).slice(0, 5).join(', ')}.`
           : "I couldn't find any recommendations based on your preferences.";
 
       } else if (questionToProcess.toLowerCase().includes("when was") || questionToProcess.toLowerCase().includes("when did")) {
