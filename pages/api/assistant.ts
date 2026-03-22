@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext, shouldRunAnalysis } from '../../utils/aiHelper';
+import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext, shouldRunAnalysis, extractGameTitleFromQuestion } from '../../utils/aiHelper';
 import { storeUserPatterns } from '../../utils/storeUserPatterns';
 import { generatePersonalizedRecommendations } from '../../utils/generateRecommendations';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
@@ -311,9 +311,25 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
       const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
 
       if (response.data.length > 0) {
-        // Use the IGDBGame interface to type the response data
         const games = response.data as IGDBGame[];
-        return `Found ${games.length} games matching your query.`;
+        // Prefer exact name match, then fall back to first result
+        const queryLower = sanitizedQuery.toLowerCase();
+        const best = games.find(g => g.name.toLowerCase() === queryLower) || games[0];
+
+        const releaseDate = best.release_dates?.[0]?.date
+          ? new Date(Number(best.release_dates[0].date) * 1000).toLocaleDateString()
+          : null;
+        const platforms = best.platforms?.map(p => p.name).join(', ') || null;
+        const genres = best.genres?.map(g => g.name).join(', ') || null;
+        const developers = best.involved_companies?.filter(ic => ic.developer).map(ic => ic.company.name).join(', ') || null;
+
+        let info = best.name;
+        if (releaseDate) info += ` (Released: ${releaseDate})`;
+        if (platforms) info += `, Platforms: ${platforms}`;
+        if (genres) info += `, Genres: ${genres}`;
+        if (developers) info += `, Developer: ${developers}`;
+
+        return info;
       } else {
         return `No games found matching "${sanitizedQuery}"`;
       }
@@ -347,22 +363,18 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
       const response = await axios.get(url);
       //console.log("RAWG API Response:", response.data); // Log the RAWG response data - commented out for production
       if (response.data && response.data.results.length > 0) {
-        const games = response.data.results.map((game: RAWGGame) => ({
-          name: game.name,
-          released: game.released,
-          genres: game.genres?.map((genre: { name: string }) => genre.name).join(', ') || 'Genres not available',
-          platforms: game.platforms?.map((platform: { platform: { name: string } }) => platform.platform.name).join(', ') || 'Platforms not available',
-          url: `https://rawg.io/games/${game.slug}` // Construct the URL using the slug
-        }));
+        const queryLower = searchQuery.toLowerCase().trim();
+        // Prefer exact name match, then fall back to the first result
+        const bestMatch: RAWGGame = response.data.results.find((g: RAWGGame) =>
+          g.name.toLowerCase().trim() === queryLower
+        ) || response.data.results.find((g: RAWGGame) =>
+          g.name.toLowerCase().includes(queryLower) || queryLower.includes(g.name.toLowerCase())
+        ) || response.data.results[0];
 
-        // Explicitly typing 'game' parameter here
-        return games.map((game: {
-          name: string;
-          released?: string;
-          genres: string;
-          platforms: string;
-          url: string;
-        }) => `${game.name} (Released: ${game.released ? new Date(game.released).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, URL: ${game.url})`).join('\n');
+        return `${bestMatch.name} (Released: ${bestMatch.released ? new Date(bestMatch.released).toLocaleDateString() : 'N/A'}, ` +
+          `Genres: ${bestMatch.genres?.map((genre: { name: string }) => genre.name).join(', ') || 'N/A'}, ` +
+          `Platforms: ${bestMatch.platforms?.map((platform: { platform: { name: string } }) => platform.platform.name).join(', ') || 'N/A'}, ` +
+          `URL: https://rawg.io/games/${bestMatch.slug})`;
       } else {
         return `No games found related to ${searchQuery}.`;
       }
@@ -375,20 +387,20 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
 
 // Function to combine game data from multiple sources (RAWG, IGDB, and local CSV)
 const fetchAndCombineGameData = async (question: string, answer: string): Promise<string> => {
-  // Extract game name from question - handle both simple and enhanced questions
-  let gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+  // Extract game name from question using the AI-powered extractor
+  let gameName = await extractGameTitleFromQuestion(question) || '';
 
-  // If the question is enhanced (contains image context markers), extract just the game title part
-  // Enhanced questions have format like: "Question\n\n[Context for identification: ...]"
-  if (gameName.includes('\n\n[') || gameName.length > 200) {
-    // Try to extract game title from the enhanced context
-    const gameMatch = gameName.match(/Game:\s*([^\n,]+)/i);
-    if (gameMatch && gameMatch[1]) {
-      gameName = gameMatch[1].trim();
-    } else {
-      // Fallback: extract from the original question part (before the context)
-      const questionPart = gameName.split('\n\n[')[0];
-      gameName = questionPart.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+  // Fallback: try simple release-date pattern or enhanced question context
+  if (!gameName) {
+    gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+    if (gameName.includes('\n\n[') || gameName.length > 200) {
+      const gameMatch = gameName.match(/Game:\s*([^\n,]+)/i);
+      if (gameMatch && gameMatch[1]) {
+        gameName = gameMatch[1].trim();
+      } else {
+        const questionPart = gameName.split('\n\n[')[0];
+        gameName = questionPart.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+      }
     }
   }
 

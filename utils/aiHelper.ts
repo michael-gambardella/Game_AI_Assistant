@@ -40,6 +40,9 @@ export function openaiRequestOptionsForModel(model: string | undefined): { timeo
   if (model === 'gpt-4o-search-preview') {
     return { timeout: OPENAI_SEARCH_PREVIEW_TIMEOUT_MS, maxRetries: 0 };
   }
+  if (model === 'gpt-5.2') {
+    return { timeout: OPENAI_SEARCH_PREVIEW_TIMEOUT_MS, maxRetries: 0 };
+  }
   return undefined;
 }
 
@@ -1678,7 +1681,15 @@ IMPORTANT INSTRUCTIONS:
       }
       
       // Enhanced system message for better answer quality
-      const enhancedSystemMessage = systemMessage || `You are Video Game Wingman, an expert AI assistant specializing in video games. 
+      const enhancedSystemMessage = systemMessage || `You are Video Game Wingman, an expert AI assistant specializing in video games.
+
+RESPONSE FORMAT - ALWAYS follow this structure:
+- Use ## for main section headings (e.g., ## Recommended Loadout, ## Phase One, ## General Tips)
+- Use - for bullet points under each section
+- Use **bold** only for key terms or sub-labels within a bullet (e.g., "- **Weapon:** Spread Shot")
+- Do NOT use bold for standalone section headings — use ## instead
+- Keep each section clearly separated; do not run sections together as plain paragraphs
+- For boss guides or multi-phase content, give each phase its own ## section
 
 CRITICAL INSTRUCTIONS - READ CAREFULLY:
 - ALWAYS identify and use the EXACT game title from the question - do NOT substitute it with a different game
@@ -1717,6 +1728,17 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
         : await getOpenAIClient().chat.completions.create(completionParams);
 
       response = completion.choices[0].message.content;
+
+      // If primary model returned no content, fall back to gpt-4o-search-preview
+      // (which can browse the web for very new games the primary model may not know)
+      if (!response && modelSelection.model !== 'gpt-4o-search-preview') {
+        console.log(`[Model Selection] ${modelSelection.model} returned no content, falling back to gpt-4o-search-preview`);
+        const fallbackCompletion = await getOpenAIClient().chat.completions.create(
+          { ...completionParams, model: 'gpt-4o-search-preview' },
+          { timeout: 120_000, maxRetries: 0 }
+        );
+        response = fallbackCompletion.choices[0].message.content;
+      }
     }
 
     // Cache the response if we got one

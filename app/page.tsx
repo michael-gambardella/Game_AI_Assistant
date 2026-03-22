@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import axios from "../utils/axiosConfig";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
@@ -1585,31 +1585,127 @@ export default function Home() {
   const formatResponse = (response: string) => {
     const { formattedText, sources, linkMap } =
       parseResponseWithSources(response);
-    const sentences = formattedText
-      .split("\n")
-      .map((sentence) => sentence.trim());
-    let stepCounter = 1;
-    return {
-      content: sentences.map((sentence, index) => {
-        if (sentence.match(/^\d+\.\s/)) {
-          const stepNumber = stepCounter++;
-          const stepContent = sentence.replace(/^\d+\.\s/, "").trim();
-          return (
-            <p key={`step-${index}-${stepNumber}`} className="mt-2">
-              <strong>{stepNumber}. </strong>
-              {parseInlineLinks(stepContent, linkMap)}
-            </p>
-          );
-        } else {
-          return (
-            <p key={`sentence-${index}`} className="mt-2">
-              {parseInlineLinks(sentence, linkMap)}
-            </p>
-          );
-        }
-      }),
-      sources,
+    const lines = formattedText.split("\n");
+
+    // Parse inline bold markers (**text**) and links within a line
+    const parseLine = (text: string, keyPrefix: string): React.ReactNode => {
+      const segments = text.split(/(\*\*[^*]+\*\*)/g);
+      if (segments.length === 1) {
+        return <>{parseInlineLinks(text, linkMap)}</>;
+      }
+      return (
+        <>
+          {segments.map((segment, i) => {
+            if (segment.startsWith("**") && segment.endsWith("**") && segment.length > 4) {
+              return (
+                <strong key={`${keyPrefix}-b${i}`}>
+                  {parseInlineLinks(segment.slice(2, -2), linkMap)}
+                </strong>
+              );
+            }
+            return (
+              <Fragment key={`${keyPrefix}-s${i}`}>
+                {parseInlineLinks(segment, linkMap)}
+              </Fragment>
+            );
+          })}
+        </>
+      );
     };
+
+    const elements: React.ReactNode[] = [];
+    let bulletItems: React.ReactNode[] = [];
+    let stepCounter = 1;
+
+    const flushBullets = (key: string) => {
+      if (bulletItems.length > 0) {
+        elements.push(
+          <ul key={key} className="list-disc pl-5 mt-2 space-y-1">
+            {bulletItems}
+          </ul>
+        );
+        bulletItems = [];
+      }
+    };
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        flushBullets(`ul-${index}`);
+        return;
+      }
+
+      // ## Section heading
+      if (trimmed.startsWith("## ")) {
+        flushBullets(`ul-${index}`);
+        elements.push(
+          <h3 key={`h3-${index}`} className="text-base font-bold mt-5 mb-1 pb-1 border-b border-gray-300 dark:border-gray-600">
+            {parseLine(trimmed.slice(3).trim(), `h3-${index}`)}
+          </h3>
+        );
+        return;
+      }
+
+      // ### Sub-heading
+      if (trimmed.startsWith("### ")) {
+        flushBullets(`ul-${index}`);
+        elements.push(
+          <h4 key={`h4-${index}`} className="text-sm font-semibold mt-3 mb-1 text-gray-700 dark:text-gray-300">
+            {parseLine(trimmed.slice(4).trim(), `h4-${index}`)}
+          </h4>
+        );
+        return;
+      }
+
+      // Numbered list item
+      if (trimmed.match(/^\d+\.\s/)) {
+        flushBullets(`ul-${index}`);
+        const stepNumber = stepCounter++;
+        const stepContent = trimmed.replace(/^\d+\.\s/, "").trim();
+        elements.push(
+          <p key={`step-${index}-${stepNumber}`} className="mt-2">
+            <strong>{stepNumber}. </strong>
+            {parseLine(stepContent, `step-${index}`)}
+          </p>
+        );
+        return;
+      }
+
+      // Bullet point (- or *)
+      if (trimmed.match(/^[-*]\s/)) {
+        const content = trimmed.replace(/^[-*]\s/, "").trim();
+        bulletItems.push(
+          <li key={`li-${index}`}>{parseLine(content, `li-${index}`)}</li>
+        );
+        return;
+      }
+
+      // Line that is only a bold phrase — treat as a section header
+      // e.g. "**Phase One:**" or "**Recommended Loadout:**"
+      const onlyBold = trimmed.match(/^\*\*([^*]+)\*\*:?\s*$/);
+      if (onlyBold) {
+        flushBullets(`ul-${index}`);
+        const headerText = onlyBold[1].replace(/:$/, "");
+        elements.push(
+          <p key={`bh-${index}`} className="mt-4 mb-1 font-bold text-gray-900 dark:text-gray-100">
+            {headerText}:
+          </p>
+        );
+        return;
+      }
+
+      // Regular paragraph
+      flushBullets(`ul-${index}`);
+      elements.push(
+        <p key={`p-${index}`} className="mt-2">
+          {parseLine(trimmed, `p-${index}`)}
+        </p>
+      );
+    });
+
+    flushBullets(`ul-end`);
+    return { content: elements, sources };
   };
 
   // Component to render formatted response with sources
