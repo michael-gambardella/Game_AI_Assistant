@@ -21,6 +21,23 @@ import { clearUserCache } from './getConversation';
 import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
 import { withRequestSizeLimit } from '../../middleware/requestSizeLimit';
 import { LRUCache, cacheManager } from '../../utils/cacheManager';
+import { ImageAnnotatorClient } from '@google-cloud/vision';
+
+// Module-level singleton for Google Vision client — avoids re-parsing credentials
+// and re-instantiating the client on every image request.
+let _visionClient: ImageAnnotatorClient | null = null;
+const getVisionClient = (): ImageAnnotatorClient | null => {
+  if (_visionClient) return _visionClient;
+  const raw = process.env.GOOGLE_CREDENTIALS;
+  if (!raw) return null;
+  try {
+    const credentials = JSON.parse(raw);
+    _visionClient = new ImageAnnotatorClient({ credentials });
+  } catch {
+    console.error('Failed to parse GOOGLE_CREDENTIALS');
+  }
+  return _visionClient;
+};
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -50,7 +67,7 @@ const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 // Cache for CSV data (single value cache with TTL)
 let csvDataCache: any[] | null = null;
 let csvDataCacheTime: number = 0;
-const CSV_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CSV_CACHE_TTL = 30 * 60 * 1000; // 30 minutes — CSV is 7.9MB; frequent re-parses add GC pressure
 
 // Cached genre mappings with LRU eviction
 const GENRE_MAPPING_CACHE_MAX_SIZE = 500; // Max 500 genre mappings
@@ -1547,13 +1564,9 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     if (imageFilePath || imageUrl) {
       try {
         // Directly use Google Vision API for image analysis (more efficient than API call)
-        const { ImageAnnotatorClient } = await import('@google-cloud/vision');
-        const credentials = process.env.GOOGLE_CREDENTIALS
-          ? JSON.parse(process.env.GOOGLE_CREDENTIALS)
-          : null;
+        const client = getVisionClient();
 
-        if (credentials) {
-          const client = new ImageAnnotatorClient({ credentials });
+        if (client) {
 
           // Determine image path - download from URL if needed
           let imagePath: string | null = null;
@@ -2113,6 +2126,10 @@ CRITICAL INSTRUCTIONS:
     answer = processedAnswer;
     metrics.questionProcessing = processingLatency;
 
+    // Resolve question type before opening the transaction so the DB session
+    // is not held open while CPU-bound keyword matching runs.
+    const questionType = checkQuestionType(question);
+
     // Measure database operations with enhanced metrics
     const dbMetrics = await measureDBQuery('Create Question', async () => {
       try {
@@ -2140,10 +2157,6 @@ CRITICAL INSTRUCTIONS:
               user.updateStreak();
               await user.save({ session });
             }
-
-            // Check question type first to prepare bulk update operations
-            const questionType = await checkQuestionType(question);
-            // console.log('Question type detected:', questionType); // Debug log - commented out for production
 
             // Check if user exists first to determine update strategy
             const existingUser = await User.findOne({ username }).session(session);

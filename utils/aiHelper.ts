@@ -5315,7 +5315,7 @@ function measureExplorationTendencies(
  * Phase 4.1: Intelligent Caching
  */
 const PATTERN_CACHE_TTL = 60 * 60 * 1000; // 1 hour
-const PATTERN_CACHE_MAX_SIZE = 1000; // Max 1000 users (roughly 50-100MB depending on pattern data size)
+const PATTERN_CACHE_MAX_SIZE = 250; // Max 250 users — 1000 was ~50-100MB; reduced to cap memory pressure
 
 // Pattern cache with LRU eviction
 const patternCache = new LRUCache<Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>>(
