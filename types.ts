@@ -90,6 +90,7 @@ export interface SideBarProps {
   onClear: () => void;
   onTwitchAuth: () => void;
   onDiscordAuth: () => void;
+  onSteamAuth: () => void;
   onNavigateToAccount: () => void;
   onOpenGuides?: () => void;
   activeView: "chat" | "forum" | "feedback";

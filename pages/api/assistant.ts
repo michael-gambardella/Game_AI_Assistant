@@ -22,6 +22,7 @@ import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
 import { withRequestSizeLimit } from '../../middleware/requestSizeLimit';
 import { LRUCache, cacheManager } from '../../utils/cacheManager';
 import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { fetchRecentlyPlayedGames } from '../../utils/steamAPI';
 
 // Module-level singleton for Google Vision client — avoids re-parsing credentials
 // and re-instantiating the client on every image request.
@@ -1455,6 +1456,31 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     // Load the user to update streak/usage data later
     const user = await User.findOne({ username });
 
+    // Fetch Steam recently played games if the user has linked their Steam account.
+    // Injected as context so the AI can give more relevant answers without the user
+    // having to specify what they've been playing.
+    let steamRecentGamesContext = '';
+    if (user?.steamId) {
+      try {
+        const recentGames = await fetchRecentlyPlayedGames(user.steamId);
+        if (recentGames && recentGames.length > 0) {
+          const gameList = recentGames.map(g => {
+            const totalHours = Math.round(g.playtime_forever / 60);
+            if (g.playtime_2weeks > 0) {
+              const recentHours = (g.playtime_2weeks / 60).toFixed(1);
+              return `${g.name} (${recentHours}h this week, ${totalHours}h total)`;
+            }
+            return totalHours > 0 ? `${g.name} (${totalHours}h total)` : g.name;
+          }).join(', ');
+          steamRecentGamesContext = `[Steam Context: This user has recently been playing: ${gameList}. When suggesting games, prioritize titles in the same or closely related game types as the games listed above. Do NOT suggest generic "best games" lists — tailor suggestions specifically to the game types and styles of the user's recent games.]`;
+        }
+        // If recentGames is an empty array the profile is private or inactive — skip silently
+      } catch (steamError) {
+        // Never let Steam API failures block question answering
+        logger.warn('Could not fetch Steam recently played games', { username });
+      }
+    }
+
     // Track request
     requestMonitor.incrementRequest();
 
@@ -1660,7 +1686,11 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     }
 
     // Measure question processing time (use enhanced question if image was analyzed)
-    const questionToProcess = imageEnhancedQuestion || question;
+    // Prepend Steam context if available so the AI knows what the user has been playing
+    const baseQuestion = imageEnhancedQuestion || question;
+    const questionToProcess = steamRecentGamesContext
+      ? `${steamRecentGamesContext}\n\n${baseQuestion}`
+      : baseQuestion;
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
       // Handle recommendation questions - check these BEFORE trying to extract a specific game
       const lowerQuestion = questionToProcess.toLowerCase();
@@ -1896,7 +1926,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         });
 
         return personalizedTip || "Here's a daily gaming tip: Take regular breaks every 45-60 minutes to keep your mind sharp and avoid fatigue. Your performance actually improves when you give yourself time to rest!";
-      } else if (questionToProcess.toLowerCase().includes("recommendations")) {
+      } else if (!steamRecentGamesContext && questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
@@ -1945,7 +1975,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         const userDataCacheKey = `twitch_user:${accessToken}`;
         const userData = await deduplicateRequest(userDataCacheKey, () => getTwitchUserData(accessToken));
         return `Twitch User Data: ${JSON.stringify(userData)}`;
-      } else if (questionToProcess.toLowerCase().includes("genre") &&
+      } else if (!steamRecentGamesContext && questionToProcess.toLowerCase().includes("genre") &&
         !questionToProcess.toLowerCase().includes("level") &&
         !questionToProcess.toLowerCase().includes("stage") &&
         !questionToProcess.toLowerCase().includes("item")) {
@@ -2112,6 +2142,12 @@ CRITICAL INSTRUCTIONS:
             'Unable to generate a response. The AI service may be temporarily unavailable. Please try again in a moment.',
             503 // Service Unavailable
           );
+        }
+
+        // Skip RAWG/IGDB lookup when the answer is based on Steam context —
+        // searching by question text returns irrelevant results in that case.
+        if (steamRecentGamesContext) {
+          return baseAnswer;
         }
 
         try {

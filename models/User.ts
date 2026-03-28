@@ -92,6 +92,8 @@ export interface IUser extends Document {
   // Twitch account linking (for viewers to link their Twitch accounts)
   twitchUsername?: string; // Twitch username (login)
   twitchId?: string; // Twitch user ID
+  // Steam account linking
+  steamId?: string; // Steam ID64
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -421,7 +423,9 @@ const UserSchema = new Schema<IUser>({
   },
   // Twitch account linking (for viewers to link their Twitch accounts)
   twitchUsername: { type: String, required: false, sparse: true, index: true },
-  twitchId: { type: String, required: false, sparse: true, index: true }
+  twitchId: { type: String, required: false, sparse: true, index: true },
+  // Steam account linking
+  steamId: { type: String, required: false, sparse: true, index: true }
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries

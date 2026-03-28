@@ -1284,6 +1284,42 @@ export default function Home() {
     window.location.href = loginUrl;
   };
 
+  const handleSteamAuth = () => {
+    window.location.href = '/api/steamLogin';
+  };
+
+  // Capture pending Steam ID from URL params on mount and clean the URL immediately.
+  // The actual API call is deferred until username is confirmed (see effect below).
+  const [pendingSteamId, setPendingSteamId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const steamLinked = params.get('steamLinked');
+    const steamId = params.get('steamId');
+
+    if (steamLinked === 'true' && steamId && /^\d+$/.test(steamId)) {
+      setPendingSteamId(steamId);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Once username is confirmed (auth ready), link the pending Steam ID.
+  // Use axios so the request interceptor can refresh an expired access token first.
+  useEffect(() => {
+    if (!pendingSteamId || !username) return;
+
+    axios.post('/api/linkSteamId', { steamId: pendingSteamId })
+      .then(({ data }) => {
+        if (data.success) {
+          console.log('Steam account linked successfully:', pendingSteamId);
+        } else {
+          console.error('Failed to link Steam account:', data.error);
+        }
+      })
+      .catch((err) => console.error('Error linking Steam account:', err))
+      .finally(() => setPendingSteamId(null));
+  }, [pendingSteamId, username]);
+
   const handleDiscordAuth = async () => {
     try {
       // Get the current logged-in username from localStorage
@@ -2379,6 +2415,7 @@ export default function Home() {
           onClear={handleClear}
           onTwitchAuth={handleTwitchAuth}
           onDiscordAuth={handleDiscordAuth}
+          onSteamAuth={handleSteamAuth}
           onNavigateToAccount={handleNavigateToAccount}
           onOpenGuides={() => setShowGuidesModal(true)}
           activeView={activeView}
