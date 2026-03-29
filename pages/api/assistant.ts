@@ -1686,11 +1686,8 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     }
 
     // Measure question processing time (use enhanced question if image was analyzed)
-    // Prepend Steam context if available so the AI knows what the user has been playing
     const baseQuestion = imageEnhancedQuestion || question;
-    const questionToProcess = steamRecentGamesContext
-      ? `${steamRecentGamesContext}\n\n${baseQuestion}`
-      : baseQuestion;
+    const questionToProcess = baseQuestion;
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
       // Handle recommendation questions - check these BEFORE trying to extract a specific game
       const lowerQuestion = questionToProcess.toLowerCase();
@@ -2018,6 +2015,14 @@ CRITICAL INSTRUCTIONS:
 5. Cross-reference visual elements with your knowledge of the game's levels
 6. Be precise and base your answer on the actual visual content shown, not general patterns
 7. If you can identify specific visual features (like "neon pink Eggman face Ferris wheel" or "tall green-lit industrial towers"), use those to pinpoint the exact level`;
+        }
+
+        // Inject Steam context into the system message so it informs the AI
+        // without polluting the question text (which would cause false game title extractions)
+        if (steamRecentGamesContext) {
+          systemMessage = systemMessage
+            ? `${systemMessage}\n\n${steamRecentGamesContext}`
+            : steamRecentGamesContext;
         }
 
         let baseAnswer: string;
