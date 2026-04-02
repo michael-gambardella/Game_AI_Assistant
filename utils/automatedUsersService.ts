@@ -687,6 +687,23 @@ export async function askQuestion(
 }
 
 /**
+ * Validate whether a forum category is appropriate for a specific game.
+ * 'mods' and 'speedruns' require the game to actually support those features.
+ * 'gameplay', 'general', and 'help' are always considered valid.
+ *
+ * @returns true if valid, false if definitely incompatible, null if uncertain (treat as valid)
+ */
+async function validateCategoryForGame(gameTitle: string, category: string): Promise<boolean | null> {
+  if (category === 'mods') {
+    return await validateGameFeature(gameTitle, 'mods');
+  }
+  if (category === 'speedruns') {
+    return await validateGameFeature(gameTitle, 'speedruns');
+  }
+  return true; // gameplay, general, help are always valid
+}
+
+/**
  * Create a forum for a game
  * @param username - The user creating the forum
  * @param gameTitle - The game title
@@ -723,6 +740,12 @@ async function createForumForGame(
             'World Record Discussion',
             'Optimal Playthroughs & Routes',
           ];
+          // Validate speedrun support - filter out speedrun topics if game doesn't have a speedrun community
+          const hasSpeedrunSupport = await validateGameFeature(gameTitle, 'speedruns');
+          if (hasSpeedrunSupport === false) {
+            console.log(`[FORUM CREATION] ${gameTitle} does not have a speedrun community - filtering out speedrun topics`);
+            return []; // Return empty array - caller should handle as incompatible category
+          }
           break;
         case 'mods':
           baseTopics = [
@@ -768,11 +791,13 @@ async function createForumForGame(
             'Tips and Discoveries',
             'Spoilers and Discussion',
           ];
-          // Validate story content - filter out "Characters & Story Talk" if game doesn't have story
+          // Validate story content - filter out story-related topics if game doesn't have story/narrative
           const hasStoryContent = await validateGameFeature(gameTitle, 'story content');
           if (hasStoryContent === false) {
-            console.log(`[FORUM CREATION] ${gameTitle} does not have story content - filtering out "Characters & Story Talk"`);
-            baseTopics = baseTopics.filter(topic => topic !== 'Characters & Story Talk');
+            console.log(`[FORUM CREATION] ${gameTitle} does not have story content - filtering out story-related topics`);
+            baseTopics = baseTopics.filter(topic =>
+              topic !== 'Characters & Story Talk' && topic !== 'Spoilers and Discussion'
+            );
           }
           break;
       }
@@ -784,7 +809,7 @@ async function createForumForGame(
       gameTitle: string;
       category: string;
       existingForumsForGame: any[];
-    }): Promise<string> => {
+    }): Promise<string | null> => {
       const categoryDisplay = forumCategoryDisplayName(normalizeForumCategory(params.category));
       const defaultGenericTitles = new Set<string>([
         normalizeTitle(`${params.gameTitle} - ${categoryDisplay}`),
@@ -801,13 +826,12 @@ async function createForumForGame(
 
       const topics = await buildCandidateTopics(params.category, params.gameTitle);
 
-      // If no topics available (e.g., mods category but game doesn't support mods), fall back to generic
+      // If no topics available, the category is incompatible with this game (e.g. mods on Tetris 99,
+      // speedruns on DDR). Return null so the caller can switch to a compatible category instead of
+      // creating a misleading "(2)" / "(3)" forum.
       if (topics.length === 0) {
-        console.log(`[FORUM CREATION] No valid topics for ${params.gameTitle} category ${params.category} - using generic title`);
-        const base = `${params.gameTitle} - ${categoryDisplay}`;
-        let suffix = 2;
-        while (taken.has(normalizeTitle(`${base} (${suffix})`))) suffix++;
-        return `${base} (${suffix})`;
+        console.log(`[FORUM CREATION] No valid topics for ${params.gameTitle} category ${params.category} - category is incompatible, signalling caller to switch`);
+        return null;
       }
 
       // Prefer non-generic topics when possible
@@ -896,6 +920,12 @@ async function createForumForGame(
       category: normalizedCategory,
       existingForumsForGame: existingForums
     });
+
+    // null means the category is incompatible with this game — signal the caller to try a different category
+    if (forumTitle === null) {
+      console.log(`[FORUM CREATION] Category '${normalizedCategory}' is incompatible with ${gameTitle} - no forum created`);
+      return null;
+    }
 
     // If an identical title already exists for this game/category (race conditions), reuse it
     const existingSameTitle = forumsInCategory.find((f: any) => {
@@ -1307,6 +1337,23 @@ export async function createForumPost(
 
     console.log(`[FORUM POST] Selected category: ${selectedCategory} for game: ${gameTitle}`);
 
+    // PRE-VALIDATE: Ensure the selected category is appropriate for this game.
+    // 'mods' and 'speedruns' only make sense for games that support them.
+    // If incompatible, switch to a safe fallback BEFORE checking for existing forums,
+    // so the combination check and any new forum creation use the correct category.
+    if (selectedCategory === 'mods' || selectedCategory === 'speedruns') {
+      const categoryValid = await validateCategoryForGame(gameTitle, selectedCategory);
+      if (categoryValid === false) {
+        // Fall back to a safe category, preferring one the game doesn't already have a forum for
+        const safeCategories = ['gameplay', 'general', 'help'];
+        const gameTitleNorm = normalizeGameTitle(gameTitle);
+        const unusedSafe = safeCategories.find(cat => !gameCategoryCombinations.has(`${gameTitleNorm}|${cat}`));
+        const prevCategory = selectedCategory;
+        selectedCategory = unusedSafe ?? safeCategories[Math.floor(Math.random() * safeCategories.length)];
+        console.log(`[FORUM POST] '${prevCategory}' is incompatible with ${gameTitle} - switched to '${selectedCategory}'`);
+      }
+    }
+
     // Now check if a forum exists for this game AND category
     // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
     // BUT allows multiple forums per game as long as they have different categories
@@ -1365,10 +1412,25 @@ export async function createForumPost(
     } else {
       // Create a new forum with the selected category
       console.log(`Creating new forum for ${gameTitle} with category ${selectedCategory}...`);
-      const newForum = await createForumForGame(username, gameTitle, selectedCategory);
+      let newForum = await createForumForGame(username, gameTitle, selectedCategory);
+
+      // If creation returned null, the category may be incompatible (e.g. picked 'mods'/'speedruns'
+      // via the random path inside createForumForGame without going through pre-validation above).
+      // Retry once with a safe fallback category.
+      if (!newForum) {
+        const safeRetryCategories = ['gameplay', 'general', 'help'].filter(c => c !== selectedCategory);
+        const gameTitleNorm2 = normalizeGameTitle(gameTitle);
+        const retryCategory =
+          safeRetryCategories.find(c => !gameCategoryCombinations.has(`${gameTitleNorm2}|${c}`)) ??
+          safeRetryCategories[0];
+        console.warn(`[FORUM POST] Forum creation failed for ${gameTitle} (category: ${selectedCategory}) - retrying with '${retryCategory}'`);
+        selectedCategory = retryCategory;
+        forumCategory = retryCategory;
+        newForum = await createForumForGame(username, gameTitle, retryCategory);
+      }
 
       if (!newForum) {
-        console.error(`[FORUM POST] Failed to create forum for ${gameTitle}. Check logs above for details.`);
+        console.error(`[FORUM POST] Failed to create forum for ${gameTitle} after retry. Check logs above for details.`);
         return {
           success: false,
           message: 'Failed to create forum for game',

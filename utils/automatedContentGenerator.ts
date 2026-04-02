@@ -92,7 +92,7 @@ const gameFeatureCache = new LRUCache<boolean | null>(
  */
 export async function validateGameFeature(
   gameTitle: string,
-  featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support'
+  featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support' | 'speedruns'
 ): Promise<boolean | null> {
   // Check cache first
   const cacheKey = `${gameTitle.toLowerCase().trim()}:${featureType}`;
@@ -115,6 +115,7 @@ export async function validateGameFeature(
       'modding support': `Does ${gameTitle} have modding support, mod tools, or an active modding community? Answer with only "YES" if it has modding support, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
       'romhacks': `Does ${gameTitle} have romhacks, custom content, or user-generated content? Answer with only "YES" if it has romhacks or custom content, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
       'world record speedruns': `Does ${gameTitle} have world record speedruns, world records, or optimal playthroughs? Answer with only "YES" if it has speedruns or world records, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
+      'speedruns': `Does ${gameTitle} have an active speedrunning community or is it commonly speedrun? Answer "YES" if the game has a meaningful speedrun community (e.g., platformers, action-adventure, RPGs with routing decisions, puzzle games with skip potential). Answer "NO" if the game cannot be meaningfully speedrun or has no real speedrun community — this includes: rhythm games (Dance Dance Revolution, Guitar Hero), sports/fitness games (Wii Sports), abstract puzzle games with no fixed ending (Tetris variants), online-only multiplayer battle royales (Tetris 99), match-3 or casual mobile-style games, or games where every playthrough is the same linear experience without routing choices. Answer "UNCERTAIN" if you're not sure.`,
     };
 
     const question = featureQuestions[featureType] || featureQuestions['story content'];
@@ -170,7 +171,7 @@ export async function validateGameFeature(
  * @returns Map of cache keys to validation results
  */
 export async function batchValidateGameFeatures(
-  validations: Array<{ gameTitle: string; featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support' }>
+  validations: Array<{ gameTitle: string; featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support' | 'speedruns' }>
 ): Promise<Map<string, boolean | null>> {
   const results = new Map<string, boolean | null>();
   
