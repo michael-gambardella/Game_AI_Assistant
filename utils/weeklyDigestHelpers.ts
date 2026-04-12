@@ -165,16 +165,18 @@ export async function getWeeklyForumActivity(
  * Get game recommendations for the weekly digest
  * Prioritizes weekly activity (forum posts, questions, achievements) and uses
  * the 5 most recent questions as fallback when weekly activity is sparse
+ * @param prefetchedForumActivity - Optional pre-fetched forum activity to avoid a duplicate DB query
  */
 export async function getWeeklyGameRecommendations(
-  username: string
+  username: string,
+  prefetchedForumActivity?: Awaited<ReturnType<typeof getWeeklyForumActivity>>
 ): Promise<string[]> {
   try {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    // Step 1: Get weekly forum activity
-    const weeklyForumActivity = await getWeeklyForumActivity(username);
+    // Step 1: Use pre-fetched forum activity if provided, otherwise fetch it
+    const weeklyForumActivity = prefetchedForumActivity ?? await getWeeklyForumActivity(username);
 
     // Step 2: Get weekly questions (past 7 days) and recent questions in parallel
     // This reduces sequential queries

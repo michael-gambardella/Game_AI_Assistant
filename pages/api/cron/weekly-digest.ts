@@ -85,11 +85,13 @@ function calculateMemoryDelta(before: ReturnType<typeof getMemoryUsage>, after: 
  * Uncomment the authentication check below and set CRON_SECRET in your environment variables.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Optional: Add authentication check
-  // const authHeader = req.headers.authorization;
-  // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return res.status(401).json({ error: 'Unauthorized' });
-  // }
+  // Authenticate cron requests using a shared secret
+  // Set CRON_SECRET in your environment variables and configure your cron
+  // service to send: Authorization: Bearer <CRON_SECRET>
+  const authHeader = req.headers.authorization;
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   // Allow both GET and POST for flexibility with different cron services
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -376,34 +378,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Check if this is the first weekly digest email
             const isFirstEmail = !user.weeklyDigest?.firstEmailSentAt;
 
-            // Get data for the email with timeout (60 seconds total for data fetching)
-            // Use Promise.allSettled to track which operations complete/fail
+            // Get data for the email with a single 60-second timeout covering all fetches.
+            // Forum activity is fetched first (fast DB query), then passed to both the
+            // email content and getWeeklyGameRecommendations — eliminating a duplicate query.
+            // Achievements and game recommendations then run in parallel.
             const dataFetchStartTime = Date.now();
             const [achievements, forumActivity, gameRecommendations] = await withTimeout(
-              Promise.all([
-                getWeeklyAchievements(username, isFirstEmail).then(result => {
-                  console.log(`[Weekly Digest] ✅ Achievements fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
-                  return result;
-                }).catch(err => {
-                  console.error(`[Weekly Digest] ❌ Achievements fetch failed for ${username}:`, err);
-                  throw err;
-                }),
-                getWeeklyForumActivity(username).then(result => {
+              (async () => {
+                // Step A: fetch forum activity once
+                const forumActivityResult = await getWeeklyForumActivity(username).then(result => {
                   console.log(`[Weekly Digest] ✅ Forum activity fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
                   return result;
                 }).catch(err => {
                   console.error(`[Weekly Digest] ❌ Forum activity fetch failed for ${username}:`, err);
                   throw err;
-                }),
-                getWeeklyGameRecommendations(username).then(result => {
-                  console.log(`[Weekly Digest] ✅ Game recommendations fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
-                  return result;
-                }).catch(err => {
-                  console.error(`[Weekly Digest] ❌ Game recommendations fetch failed for ${username}:`, err);
-                  throw err;
-                })
-              ]),
-              60000, // 60 seconds timeout for data fetching
+                });
+
+                // Step B: fetch achievements and game recommendations in parallel,
+                // passing pre-fetched forum activity to avoid a second DB query
+                const [achievementsResult, gameRecommendationsResult] = await Promise.all([
+                  getWeeklyAchievements(username, isFirstEmail).then(result => {
+                    console.log(`[Weekly Digest] ✅ Achievements fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
+                    return result;
+                  }).catch(err => {
+                    console.error(`[Weekly Digest] ❌ Achievements fetch failed for ${username}:`, err);
+                    throw err;
+                  }),
+                  getWeeklyGameRecommendations(username, forumActivityResult).then(result => {
+                    console.log(`[Weekly Digest] ✅ Game recommendations fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
+                    return result;
+                  }).catch(err => {
+                    console.error(`[Weekly Digest] ❌ Game recommendations fetch failed for ${username}:`, err);
+                    throw err;
+                  })
+                ]);
+
+                return [achievementsResult, forumActivityResult, gameRecommendationsResult] as const;
+              })(),
+              60000, // 60 seconds timeout covering all data fetching
               `Weekly digest data fetch for ${username}`
             ).catch((error) => {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
