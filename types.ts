@@ -207,6 +207,21 @@ export interface VerificationResponse {
   };
 }
 
+/**
+ * Minimal structural interfaces used by forum authorization helpers.
+ * Kept separate from the full Forum/ForumPost types so they work with
+ * both plain objects and Mongoose documents.
+ */
+export interface ForumLike {
+  isPrivate: boolean;
+  allowedUsers?: string[];
+  createdBy: string;
+}
+
+export interface PostLike {
+  createdBy: string;
+}
+
 export interface ForumFilters {
   gameTitle?: string;
   category?: string;

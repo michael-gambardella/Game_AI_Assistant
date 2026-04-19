@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
+import { isForumOwner } from '../../utils/forumAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -39,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Only allow forum creator to delete
-    if (forum.createdBy !== username) {
+    if (!isForumOwner(forum, username)) {
       return res.status(403).json({ error: 'Only the forum creator can delete this forum' });
     }
 

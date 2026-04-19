@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { getEffectiveForumStatus } from '../../utils/forumStatus';
+import { hasForumAccess } from '../../utils/forumAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -64,14 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if forum is private and user has access
-    if (forum.isPrivate) {
-      // Ensure allowedUsers array exists
-      if (!forum.allowedUsers || !Array.isArray(forum.allowedUsers)) {
-        forum.allowedUsers = [];
-      }
-      if (!forum.allowedUsers.includes(username as string)) {
-        return res.status(403).json({ error: 'Access denied to private forum' });
-      }
+    if (!hasForumAccess(forum, username as string)) {
+      return res.status(403).json({ error: 'Access denied to private forum' });
     }
 
     // Only increment view count if incrementView is not explicitly set to false and the user hasn't viewed this forum before

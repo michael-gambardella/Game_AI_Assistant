@@ -4,6 +4,7 @@ import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { checkUserBanStatus } from '../../utils/violationHandler';
+import { hasForumAccess } from '../../utils/forumAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -63,8 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if forum is private and user is allowed
-    if (forum.isPrivate && !forum.allowedUsers.includes(username)) {
-      return res.status(403).json({ 
+    if (!hasForumAccess(forum, username)) {
+      return res.status(403).json({
         error: 'Not authorized to post in this forum',
         details: `This is a private forum. You must be added to the allowed users list to post. Current allowed users: ${forum.allowedUsers.length}`
       });

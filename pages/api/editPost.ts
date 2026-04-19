@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
+import { isPostOwner } from '../../utils/forumAuth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT' && req.method !== 'PATCH') {
@@ -75,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Only allow post creator to edit
-    if (post.createdBy !== username) {
+    if (!isPostOwner(post, username)) {
       return res.status(403).json({ error: 'Only the post creator can edit this post' });
     }
 
