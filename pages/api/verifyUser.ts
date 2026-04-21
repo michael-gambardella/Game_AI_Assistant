@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { verifyKey } from 'discord-interactions';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { createLogger } from '../../utils/logger';
 import { DiscordRequest, VerificationResponse } from '../../types';
@@ -31,7 +31,7 @@ const verifyDiscordRequest = async (req: NextApiRequest): Promise<boolean> => {
 };
 
 // Main handler with improved error handling and validation
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<VerificationResponse>
 ) {
@@ -71,7 +71,6 @@ export default async function handler(
     let retries = 3;
     while (retries > 0) {
       try {
-        await connectToMongoDB();
         break;
       } catch (error) {
         retries--;
@@ -154,3 +153,5 @@ export const config = {
     bodyParser: true,
   },
 };
+
+export default withDatabase(handler);

@@ -1,12 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { hashPassword, validatePassword } from '../../../utils/passwordUtils';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { handleContentViolation } from '../../../utils/violationHandler';
-import mongoose from 'mongoose';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -18,9 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     const user = await User.findOne({ userId });
 
@@ -101,3 +97,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export default withWingmanDB(handler);

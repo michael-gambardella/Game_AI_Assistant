@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import TwitchBotChannel from '../../../models/TwitchBotChannel';
 import { getSession } from '../../../utils/session';
 import { logger } from '../../../utils/logger';
@@ -10,7 +10,7 @@ import { validateChannelSettings, TwitchChannelSettings } from '../../../config/
  * Handles getting and updating channel-specific bot settings
  * All operations require authentication and verify streamer ownership
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
   const session = await getSession(req);
   if (!session || !session.username) {
@@ -64,7 +64,6 @@ async function handleGetSettings(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -115,7 +114,6 @@ async function handleUpdateSettings(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -153,3 +151,4 @@ async function handleUpdateSettings(
   });
 }
 
+export default withDatabase(handler);

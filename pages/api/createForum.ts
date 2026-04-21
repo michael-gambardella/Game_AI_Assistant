@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import connectToMongoDB from "../../utils/mongodb";
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
 import { validateUserAuthentication, validateForumData } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
@@ -19,7 +19,7 @@ const validateAuth = (req: NextApiRequest) => {
   return null;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // console.log("HEADERS:", req.headers); // Commented out for production
 
   if (req.method !== 'POST') {
@@ -27,7 +27,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    await connectToMongoDB();
 
     // Validate authentication header
     const authError = validateAuth(req);
@@ -128,3 +127,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
+export default withDatabase(handler);

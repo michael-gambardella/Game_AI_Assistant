@@ -1,18 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import Feedback from '../../../models/Feedback';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { handleContentViolation, checkUserBanStatus } from '../../../utils/violationHandler';
 import { checkProAccess } from '../../../utils/proAccessUtil';
 import { validateFeedbackData } from '../../../utils/validation';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
     
     const { 
       username, 
@@ -159,3 +158,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withDatabase(handler);

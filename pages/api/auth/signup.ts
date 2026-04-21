@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { hashPassword, validatePassword } from '../../../utils/passwordUtils';
 import { sendWelcomeEmail } from '../../../utils/emailService';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { handleContentViolation } from '../../../utils/violationHandler';
-import mongoose from 'mongoose';
 import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
 
 // Email validation regex
@@ -62,9 +61,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Check if email already exists
     const existingUserByEmail = await User.findOne({ email });
@@ -210,4 +206,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 // Apply request size limiting middleware to prevent DoS attacks
-export default withRequestSizeLimit(handler);
+export default withRequestSizeLimit(withWingmanDB(handler));

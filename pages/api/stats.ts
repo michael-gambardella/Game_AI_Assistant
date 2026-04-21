@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import Question from '../../models/Question';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -18,7 +18,6 @@ export default async function handler(
   }
 
   try {
-    await connectToMongoDB();
 
     const user = await User.findOne({ username }).select('streak conversationCount');
 
@@ -57,3 +56,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

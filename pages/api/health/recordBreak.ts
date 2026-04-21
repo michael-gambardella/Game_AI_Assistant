@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { RecordBreakResponse } from '../../../types';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<RecordBreakResponse>
 ) {
@@ -27,7 +27,6 @@ export default async function handler(
     }
 
     // Connect to database
-    await connectToMongoDB();
 
     // Find user
     const user = await User.findOne({ username });
@@ -60,3 +59,5 @@ export default async function handler(
     });
   }
 }
+
+export default withDatabase(handler);

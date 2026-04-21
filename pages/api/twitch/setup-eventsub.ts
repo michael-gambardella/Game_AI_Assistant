@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from '../../../utils/session';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import TwitchBotChannel from '../../../models/TwitchBotChannel';
 import { setupEventSubSubscriptions, removeEventSubSubscriptions, listEventSubSubscriptions } from '../../../utils/twitch/eventsubSetup';
 import { logger } from '../../../utils/logger';
@@ -17,7 +17,7 @@ import { logger } from '../../../utils/logger';
  * GET /api/twitch/setup-eventsub
  * - Lists all EventSub subscriptions
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow authenticated users
   const session = await getSession(req);
   if (!session || !session.username) {
@@ -25,7 +25,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    await connectToMongoDB();
 
     if (req.method === 'POST') {
       // Set up EventSub subscriptions for a channel
@@ -209,3 +208,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withDatabase(handler);

@@ -1,13 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { generateResetToken } from '../../../utils/passwordUtils';
-import mongoose from 'mongoose';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -37,9 +36,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Find user by email and verify code
     const user = await User.findOne({
@@ -83,3 +79,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withWingmanDB(handler);

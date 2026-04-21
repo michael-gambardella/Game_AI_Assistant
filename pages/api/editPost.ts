@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { isPostOwner } from '../../utils/forumAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT' && req.method !== 'PATCH') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -61,7 +61,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    await connectToMongoDB();
     
     // First, find the forum and post to check authorization
     const forum = await Forum.findOne({ forumId });
@@ -128,3 +127,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withDatabase(handler);

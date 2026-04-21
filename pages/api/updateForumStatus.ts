@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import mongoose from 'mongoose';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
 import { validateAdminAccess } from '../../utils/adminAccess';
@@ -13,13 +13,12 @@ const ALLOWED_STATUSES = ['active', 'archived'] as const;
  * - active: forum can be posted to.
  * - archived: read-only; everyone can view, no one can post. Creator or admin can restore to active.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
 
     // Use body.username for creator/admin check (client sends username; Bearer may be userId)
     let username: string | null = null;
@@ -89,3 +88,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withDatabase(handler);

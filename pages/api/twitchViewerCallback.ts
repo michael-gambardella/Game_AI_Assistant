@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { verifyOAuthState } from './twitchViewerLogin';
 import { logger } from '../../utils/logger';
@@ -10,7 +10,7 @@ import { logger } from '../../utils/logger';
  * This handles the OAuth callback when a viewer links their Twitch account
  * to their Video Game Wingman account for bot usage
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { code, error, error_description, state } = req.query;
 
   // Log what we received for debugging
@@ -179,7 +179,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const twitchId = twitchUserData.id;
 
     // Connect to database
-    await connectToMongoDB();
 
     // Verify username exists in database
     const user = await User.findOne({ username: username }).select('username twitchUsername twitchId').lean();
@@ -250,3 +249,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withDatabase(handler);

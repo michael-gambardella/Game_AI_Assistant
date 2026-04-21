@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import connectToMongoDB from "../../utils/mongodb";
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
 
 // Valid reaction types
 const VALID_REACTIONS = ["🔥", "💡", "❓", "❤️"];
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -14,7 +14,6 @@ export default async function handler(
   }
 
   try {
-    await connectToMongoDB();
     const { forumId, postId, username, reactionType } = req.body;
 
     if (!forumId || !postId || !username || !reactionType) {
@@ -106,3 +105,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

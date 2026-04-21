@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from '../../utils/session';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { logger } from '../../utils/logger';
 
@@ -11,7 +11,7 @@ import { logger } from '../../utils/logger';
  * 
  * Accepts username as query parameter as fallback if session is expired
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -37,7 +37,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (usernameParam) {
       // Verify username exists in database
       try {
-        await connectToMongoDB();
         const user = await User.findOne({ username: usernameParam }).select('username').lean();
         if (user) {
           username = usernameParam;
@@ -111,3 +110,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Redirect to Twitch OAuth
   res.redirect(twitchAuthUrl);
 }
+
+export default withDatabase(handler);

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { ChallengeProgress, ChallengeProgresses, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../../types';
 import { logger } from '../../utils/logger';
@@ -13,7 +13,7 @@ import { getTodaysChallenges } from '../../utils/challengeSelector';
  * Returns the challenge progress for today's challenges (Phase 2: Multiple Challenges)
  * Also supports legacy single challenge format for backward compatibility
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ 
     progress?: ChallengeProgress | null; // Legacy: single challenge (backward compatibility)
@@ -31,7 +31,6 @@ export default async function handler(
         return res.status(400).json({ error: 'Username is required' });
       }
 
-      await connectToMongoDB();
 
       const user = await User.findOne({ username }).select('challengeProgress challengeProgresses challengeStreak challengeRewards');
 
@@ -164,7 +163,6 @@ export default async function handler(
         }
       }
 
-      await connectToMongoDB();
 
       // Get today's date string to ensure we're saving for today (UTC)
       const todayString = getTodayDateString();
@@ -454,3 +452,4 @@ export default async function handler(
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+export default withDatabase(handler);

@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
-import mongoose from 'mongoose';
 import { unlockAccount } from '../../../utils/accountLockout';
 import { requireAuth } from '../../../middleware/auth';
 
@@ -12,7 +11,7 @@ import { requireAuth } from '../../../middleware/auth';
  * 
  * Note: This endpoint requires authentication. You may want to add admin role checking.
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -39,9 +38,6 @@ export default async function handler(
     }
 
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Find user
     const query: any = {};
@@ -92,3 +88,4 @@ export default async function handler(
   }
 }
 
+export default withWingmanDB(handler);

@@ -8,10 +8,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import { dismissRecommendations } from '../../utils/generateRecommendations';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -29,7 +29,6 @@ export default async function handler(
   }
 
   try {
-    await connectToMongoDB();
 
     // Mark recommendations as dismissed
     await dismissRecommendations(username);
@@ -48,3 +47,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
 import User from '../../models/User';
 import { joinChannel } from '../../utils/twitchBot';
@@ -11,7 +11,7 @@ import { logger } from '../../utils/logger';
  * This handles the OAuth callback when a streamer authorizes the bot to join their channel
  * Saves channel authorization and automatically joins the channel
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { code, error, error_description, state } = req.query;
 
   // Log what we received for debugging
@@ -139,7 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Note: We're not strictly verifying session here because tokens might be expired
   // but the user is still "logged in" from frontend perspective
   try {
-    await connectToMongoDB();
     const user = await User.findOne({ username: streamerUsername }).select('username').lean();
     if (!user) {
       logger.error('Username from state not found in database', { streamerUsername });
@@ -225,7 +224,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const streamerTwitchId = twitchUserData.id;
 
     // Connect to database
-    await connectToMongoDB();
 
     // Check if channel already exists
     const existingChannel = await TwitchBotChannel.findOne({ 
@@ -336,3 +334,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 }
+
+export default withDatabase(handler);

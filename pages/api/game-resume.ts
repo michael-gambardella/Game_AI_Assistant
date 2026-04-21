@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Question from '../../models/Question';
 import { getChatCompletion } from '../../utils/aiHelper';
-import mongoose from 'mongoose';
 import { GameResumeResponse } from '../../types';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<GameResumeResponse>
 ) {
@@ -21,9 +20,6 @@ export default async function handler(
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToMongoDB();
-    }
 
     // Find the most recent question with a detected game
     const recentGameQuestion = await Question.findOne({
@@ -204,3 +200,4 @@ Only return valid JSON, nothing else.`;
   }
 }
 
+export default withDatabase(handler);

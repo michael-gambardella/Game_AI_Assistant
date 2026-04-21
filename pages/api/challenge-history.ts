@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { ChallengeHistoryEntry } from '../../types';
 import { logger } from '../../utils/logger';
@@ -8,7 +8,7 @@ import { logger } from '../../utils/logger';
  * GET /api/challenge-history?username=xxx&limit=30&offset=0
  * Returns paginated challenge history for a user
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{
     history: ChallengeHistoryEntry[];
@@ -47,7 +47,6 @@ export default async function handler(
       });
     }
 
-    await connectToMongoDB();
 
     // Select challengeHistory field - MongoDB will return all sub-fields including challengeTitle and challengeDescription
     const user = await User.findOne({ username }).select('challengeHistory').lean();
@@ -131,3 +130,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

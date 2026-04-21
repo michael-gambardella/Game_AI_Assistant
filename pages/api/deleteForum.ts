@@ -1,16 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
 import { isForumOwner } from '../../utils/forumAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
     let username = 'test-user';
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -59,4 +58,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error deleting forum:', error);
     return res.status(500).json({ error: 'Failed to delete forum' });
   }
-} 
+}
+
+export default withDatabase(handler);

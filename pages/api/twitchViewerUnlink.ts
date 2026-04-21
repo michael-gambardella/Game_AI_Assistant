@@ -1,13 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from '../../utils/session';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { logger } from '../../utils/logger';
 
 /**
  * API endpoint to unlink a Twitch account from a user's Video Game Wingman account
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -25,7 +25,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const username = session.username;
 
     // Connect to database
-    await connectToMongoDB();
 
     // Find user and check if they have a linked Twitch account
     const user = await User.findOne({ username }).select('username twitchUsername twitchId').lean() as {
@@ -83,3 +82,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withDatabase(handler);

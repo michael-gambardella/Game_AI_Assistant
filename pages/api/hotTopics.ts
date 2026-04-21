@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import connectToMongoDB from "../../utils/mongodb";
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
 import { HotTopicSummary } from "../../types";
 
@@ -7,7 +7,7 @@ const TRENDING_LIMIT = 3;
 const NEW_THIS_WEEK_LIMIT = 5;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -16,7 +16,6 @@ export default async function handler(
   }
 
   try {
-    await connectToMongoDB();
 
     const username =
       (req.query.username as string) || (req.headers.username as string) || "test-user";
@@ -111,3 +110,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

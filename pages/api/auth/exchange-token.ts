@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { verifyCrossDomainAuthToken } from '../../../utils/jwt';
 import { setAuthCookiesWithDomain, setAuthCookies } from '../../../utils/session';
-import mongoose from 'mongoose';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -14,9 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     let decoded;
     let user;
@@ -105,3 +101,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withWingmanDB(handler);

@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { verifyAccessToken } from '../../../utils/jwt';
 import { getTokenFromCookies, ACCESS_TOKEN_COOKIE } from '../../../utils/session';
-import mongoose from 'mongoose';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -42,9 +41,6 @@ export default async function handler(
     }
 
     // Connect to database if needed
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Find user by userId from token
     const user = await User.findOne({ userId: decoded.userId }).lean() as any;
@@ -89,3 +85,4 @@ export default async function handler(
   }
 }
 
+export default withWingmanDB(handler);

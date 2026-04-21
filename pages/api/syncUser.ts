@@ -1,12 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { syncUserData } from '../../utils/proAccessUtil';
-import { connectToWingmanDB } from '../../utils/databaseConnections';
+import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
-import mongoose from 'mongoose';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { handleContentViolation } from '../../utils/violationHandler';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Allow both GET and POST for convenience
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -27,9 +26,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Check for offensive content in username
     if (username) {
@@ -201,4 +197,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-} 
+}
+
+export default withWingmanDB(handler);

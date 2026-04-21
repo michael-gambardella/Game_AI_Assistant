@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { hashPassword } from '../../../utils/passwordUtils';
 import crypto from 'crypto';
@@ -135,14 +135,13 @@ const createGamerUser = async (
   return userResponse;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     // Connect to database
-    await connectToWingmanDB();
 
     const createdUsers: any = {
       common: {},
@@ -242,3 +241,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withWingmanDB(handler);

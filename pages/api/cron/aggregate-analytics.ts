@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import {
   aggregatePreviousHour,
   aggregatePreviousDay,
@@ -36,7 +36,7 @@ import { logger } from '../../../utils/logger';
  * Security: Consider adding authentication (API key, secret header, etc.)
  * Uncomment the authentication check below and set CRON_SECRET in your environment variables.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Optional: Add authentication check
   // const authHeader = req.headers.authorization;
   // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -54,7 +54,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const isTestMode = req.query.test === 'true';
 
   try {
-    await connectToWingmanDB();
 
     let result;
 
@@ -142,3 +141,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withWingmanDB(handler);

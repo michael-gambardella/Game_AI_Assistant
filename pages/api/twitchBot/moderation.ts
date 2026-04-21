@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import TwitchBotChannel from '../../../models/TwitchBotChannel';
 import { getSession } from '../../../utils/session';
 import { logger } from '../../../utils/logger';
@@ -9,7 +9,7 @@ import { TwitchModerationConfig, defaultModerationConfig } from '../../../config
  * Moderation Settings API for Twitch Bot
  * Handles getting and saving per-channel moderation configuration
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
   const session = await getSession(req);
   if (!session || !session.username) {
@@ -62,7 +62,6 @@ async function handleGetModerationConfig(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -142,7 +141,6 @@ async function handleSaveModerationConfig(
       : defaultModerationConfig.logAllActions,
   };
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -177,3 +175,4 @@ async function handleSaveModerationConfig(
   });
 }
 
+export default withDatabase(handler);

@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { getSession } from '../../utils/session';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { logger } from '../../utils/logger';
 
@@ -10,7 +10,7 @@ import { logger } from '../../utils/logger';
  * NOTE: For linking Twitch accounts for bot usage, use /api/twitchViewerLogin instead
  * This endpoint is kept for backward compatibility
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
     logger.info('Twitch callback received', { query: Object.keys(req.query) });
 
     const { code, error, error_description } = req.query;
@@ -104,7 +104,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const session = await getSession(req);
         if (session && session.username && twitchUserData) {
             try {
-                await connectToMongoDB();
                 await User.findOneAndUpdate(
                     { username: session.username },
                     {
@@ -138,3 +137,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     }
 }
+
+export default withDatabase(handler);

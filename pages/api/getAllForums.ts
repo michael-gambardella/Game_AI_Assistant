@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
 import { normalizeForumCategory } from '../../utils/forumCategory';
@@ -10,13 +10,12 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
     // Use test user for local development if user-id is not provided
     let username = req.headers['username'] as string;
     if (!username) {
@@ -101,4 +100,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error fetching forums:', error);
     return res.status(500).json({ error: 'Error fetching forums' });
   }
-} 
+}
+
+export default withDatabase(handler);

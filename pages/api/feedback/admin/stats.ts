@@ -1,15 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../../utils/mongodb';
+import { withDatabase } from '../../../../utils/withDatabase';
 import Feedback from '../../../../models/Feedback';
 import { requireAdminAccess } from '../../../../utils/adminAccess';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
     
     const { username, timeframe = '30' } = req.query;
     // console.log('Admin stats API called with username:', username); // Commented out for production
@@ -172,3 +171,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withDatabase(handler);

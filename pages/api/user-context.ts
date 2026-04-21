@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import mongoose from 'mongoose';
 import { UserContextResponse } from '../../types';
 import axios from 'axios';
 import { LRUCache } from '../../utils/cacheManager';
@@ -32,7 +31,7 @@ const gameVerificationCache = new LRUCache<boolean>(
 cacheManager.registerCache('UserContextCache', userContextCache);
 cacheManager.registerCache('GameVerificationCache', gameVerificationCache);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<UserContextResponse>
 ) {
@@ -57,9 +56,6 @@ export default async function handler(
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToMongoDB();
-    }
 
     // Get user's recent questions with detected games and genres
     // Optimized: Only fetch what we need, limit to 50 questions (sufficient for analysis)
@@ -433,3 +429,4 @@ export default async function handler(
   }
 }
 
+export default withDatabase(handler);

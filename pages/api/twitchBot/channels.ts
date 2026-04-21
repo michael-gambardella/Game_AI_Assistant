@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import TwitchBotChannel from '../../../models/TwitchBotChannel';
 import { getSession } from '../../../utils/session';
 import { joinChannel, leaveChannel, isBotInitialized } from '../../../utils/twitchBot';
@@ -10,7 +10,7 @@ import { logger } from '../../../utils/logger';
  * Handles listing, enabling, disabling, and removing channels
  * All operations require authentication and verify streamer ownership
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
   const session = await getSession(req);
   if (!session || !session.username) {
@@ -60,7 +60,6 @@ async function handleListChannels(
   res: NextApiResponse,
   username: string
 ) {
-  await connectToMongoDB();
 
   const channels = await TwitchBotChannel.find({ streamerUsername: username })
     .select('channelName streamerTwitchId isActive addedAt messageCount lastJoinedAt lastLeftAt')
@@ -99,7 +98,6 @@ async function handleEnableChannel(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -174,7 +172,6 @@ async function handleUpdateChannel(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -244,7 +241,6 @@ async function handleRemoveChannel(
     });
   }
 
-  await connectToMongoDB();
 
   const normalizedChannelName = channelName.toLowerCase().trim();
 
@@ -295,3 +291,5 @@ async function handleRemoveChannel(
     channelName: normalizedChannelName
   });
 }
+
+export default withDatabase(handler);

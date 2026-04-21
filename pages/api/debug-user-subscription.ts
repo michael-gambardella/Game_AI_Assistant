@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../utils/databaseConnections';
+import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -17,7 +17,6 @@ export default async function handler(
       return res.status(400).json({ message: 'Username is required' });
     }
 
-    await connectToWingmanDB();
 
     // Find the user
     const user = await User.findOne({ username });
@@ -41,3 +40,5 @@ export default async function handler(
     });
   }
 }
+
+export default withWingmanDB(handler);

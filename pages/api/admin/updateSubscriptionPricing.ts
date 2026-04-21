@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
-import mongoose from 'mongoose';
 import User from '../../../models/User';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import { requireAdminAccess } from '../../../utils/adminAccess';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
@@ -19,7 +18,7 @@ type MigrationDetail = {
   reason?: string;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -51,9 +50,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     const usersNeedingUpdate = await User.find({
       hasProAccess: true,
@@ -158,4 +154,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-
+export default withWingmanDB(handler);

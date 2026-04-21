@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import {
   getWeeklyAchievements,
@@ -84,7 +84,7 @@ function calculateMemoryDelta(before: ReturnType<typeof getMemoryUsage>, after: 
  * Security: Consider adding authentication (API key, secret header, etc.)
  * Uncomment the authentication check below and set CRON_SECRET in your environment variables.
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Authenticate cron requests using a shared secret
   // Set CRON_SECRET in your environment variables and configure your cron
   // service to send: Authorization: Bearer <CRON_SECRET>
@@ -199,7 +199,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Connect to MongoDB
-    await connectToMongoDB();
 
     // Get users - either all users or a single test user
     type UserForDigest = {
@@ -729,3 +728,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withDatabase(handler);

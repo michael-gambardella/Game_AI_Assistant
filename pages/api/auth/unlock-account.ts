@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
-import mongoose from 'mongoose';
 import {
   verifyUnlockToken,
   unlockAccount,
@@ -12,7 +11,7 @@ import {
  * POST /api/auth/unlock-account
  * Body: { token: string }
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -31,9 +30,6 @@ export default async function handler(
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Find user with matching unlock token
     const user = await User.findOne({
@@ -76,3 +72,4 @@ export default async function handler(
   }
 }
 
+export default withWingmanDB(handler);

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Question from '../../models/Question';
 import { logger } from '../../utils/logger';
 
@@ -52,7 +52,7 @@ export function clearUserCache(username: string): void {
 }
 
 // get conversation
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -70,7 +70,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { page, pageSize, skip } = parseQueryParams(req.query);
 
     // Connect to MongoDB
-    await connectToMongoDB();
 
     // Get total count for pagination
     const total = await Question.countDocuments({ username });
@@ -176,3 +175,5 @@ export async function clearCache(req: NextApiRequest, res: NextApiResponse) {
     res.status(500).json({ error: 'Failed to clear cache' });
   }
 }
+
+export default withDatabase(handler);

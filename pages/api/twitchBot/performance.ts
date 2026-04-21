@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import { getSession } from '../../../utils/session';
 import { logger } from '../../../utils/logger';
 import { getPerformanceMonitor } from '../../../utils/twitch/performanceMonitor';
@@ -16,7 +16,7 @@ import TwitchBotChannel from '../../../models/TwitchBotChannel';
  * - GET /api/twitchBot/performance?type=thresholds
  * - POST /api/twitchBot/performance?type=acknowledge (body: { alertId: "xxx" } or { acknowledgeAll: true, channelName: "xxx" })
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check authentication
   const session = await getSession(req);
   if (!session || !session.username) {
@@ -88,7 +88,6 @@ async function verifyChannelOwnership(
   username: string
 ): Promise<boolean> {
   try {
-    await connectToWingmanDB();
     const channel = await TwitchBotChannel.findOne({
       channelName: channelName.toLowerCase().trim(),
       ownerUsername: username
@@ -387,3 +386,5 @@ async function handleAcknowledgeAlert(
     throw error;
   }
 }
+
+export default withWingmanDB(handler);

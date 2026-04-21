@@ -3,7 +3,7 @@ import formidable from 'formidable';
 import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { getImageStorage } from '../../../utils/imageStorage';
 import { moderateImage } from '../../../utils/imageModeration';
@@ -70,13 +70,12 @@ const safeUnlink = async (filePath: string, maxRetries: number = 5, delay: numbe
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToWingmanDB();
 
     const form = formidable({
       uploadDir: tempUploadDir,
@@ -196,3 +195,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withWingmanDB(handler);

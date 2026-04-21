@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { withDatabase } from '../../utils/withDatabase';
 import Question from '../../models/Question';
 import Forum from '../../models/Forum';
 import User from '../../models/User';
@@ -531,7 +531,7 @@ async function getGenreSpecialistsLeaderboard(
   }));
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<LeaderboardResponse | { error: string }>
 ) {
@@ -540,7 +540,6 @@ export default async function handler(
   }
 
   try {
-    await connectToMongoDB();
 
     // Parse query parameters
     const type = (req.query.type as LeaderboardType) || 'questions';
@@ -650,3 +649,5 @@ export default async function handler(
     });
   }
 }
+
+export default withDatabase(handler);

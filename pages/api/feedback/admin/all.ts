@@ -1,15 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../../../utils/mongodb';
+import { withDatabase } from '../../../../utils/withDatabase';
 import Feedback from '../../../../models/Feedback';
 import { requireAdminAccess, getAdminUsernameForLogging } from '../../../../utils/adminAccess';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    await connectToMongoDB();
     
     const { username, page = 1, limit = 20, status, category, priority, userType, search } = req.query;
     
@@ -173,3 +172,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withDatabase(handler);

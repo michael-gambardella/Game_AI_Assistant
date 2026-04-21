@@ -1,14 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../utils/databaseConnections';
+import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    await connectToWingmanDB();
 
     // console.log('🔄 Starting unlimited usage limit cleanup...'); // Commented out for production
 
@@ -73,3 +72,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withWingmanDB(handler);

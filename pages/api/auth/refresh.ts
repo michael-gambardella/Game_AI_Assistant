@@ -2,11 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { verifyRefreshToken } from '../../../utils/jwt';
 import { getTokenFromCookies, REFRESH_TOKEN_COOKIE, setAuthCookiesWithSession } from '../../../utils/session';
 import { blacklistToken } from '../../../utils/tokenBlacklist';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
-import mongoose from 'mongoose';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -25,9 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const decoded = await verifyRefreshToken(refreshToken);
 
     // Connect to database to verify user still exists
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Check if the session associated with this refresh token is still active
     // Note: If session doesn't exist in DB, we allow refresh (backward compatibility)
@@ -137,3 +133,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withWingmanDB(handler);

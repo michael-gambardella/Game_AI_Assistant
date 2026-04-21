@@ -1,9 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { comparePassword } from '../../../utils/passwordUtils';
 import { setAuthCookies, setAuthCookiesWithSession } from '../../../utils/session';
-import mongoose from 'mongoose';
 import {
   checkAccountLocked,
   trackFailedLoginAttempt,
@@ -65,9 +64,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Connect to database
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
 
     // Find user by username or email
     const user = await User.findOne({
@@ -205,4 +201,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 // Apply request size limiting middleware to prevent DoS attacks
-export default withRequestSizeLimit(handler);
+export default withRequestSizeLimit(withWingmanDB(handler));

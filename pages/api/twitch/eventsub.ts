@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
-import connectToMongoDB from '../../../utils/mongodb';
+import { withDatabase } from '../../../utils/withDatabase';
 import TwitchBotChannel from '../../../models/TwitchBotChannel';
 import { getEngagementTracker } from '../../../utils/twitchBot';
 import { logger } from '../../../utils/logger';
@@ -282,7 +282,7 @@ async function calculateCurrentVelocity(channelName: string): Promise<number> {
 /**
  * EventSub Webhook Handler
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -394,7 +394,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
  */
 async function getChannelNameFromUserId(userId: string): Promise<string | null> {
   try {
-    await connectToMongoDB();
     
     const channel = await TwitchBotChannel.findOne({
       streamerTwitchId: userId
@@ -414,3 +413,4 @@ async function getChannelNameFromUserId(userId: string): Promise<string | null> 
   }
 }
 
+export default withDatabase(handler);

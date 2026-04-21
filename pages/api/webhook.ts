@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB } from '../../utils/databaseConnections';
+import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
 import Stripe from 'stripe';
 
@@ -28,7 +28,7 @@ function getRawBody(req: NextApiRequest): Promise<Buffer> {
   });
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -63,7 +63,6 @@ export default async function handler(
   }
 
   try {
-    await connectToWingmanDB();
 
     // Enable logging for testing - set WEBHOOK_DEBUG=true in .env to enable
     const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
@@ -427,4 +426,6 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   );
 
   // console.log(`Payment failed for subscription ${subscriptionId}`); // Commented out for production
-} 
+}
+
+export default withWingmanDB(handler);

@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { connectToWingmanDB, connectToSplashDB } from '../../../utils/databaseConnections';
+import { withWingmanDB } from '../../../utils/withDatabase';
+import { connectToSplashDB } from '../../../utils/databaseConnections';
 import User from '../../../models/User';
 import { requireAdminAccess } from '../../../utils/adminAccess';
-import mongoose from 'mongoose';
 import { Schema } from 'mongoose';
 import { ISplashUser } from '../../../types';
 
@@ -25,7 +25,7 @@ const splashUserSchema = new Schema<ISplashUser>({
  * This finds all users with hasProAccess: true but wrong subscription status
  * and updates them to free_period if they're eligible for early access
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Allow both GET and POST for convenience (GET from browser, POST from scripts)
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -41,9 +41,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     requireAdminAccess(username);
 
     // Connect to databases
-    if (mongoose.connection.readyState !== 1) {
-      await connectToWingmanDB();
-    }
     const splashDB = await connectToSplashDB();
     // Create model if it doesn't exist (same pattern as proAccessUtil.ts)
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
@@ -195,3 +192,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
+export default withWingmanDB(handler);
