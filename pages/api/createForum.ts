@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withDatabase } from '../../utils/withDatabase';
+import { withProAccess } from '../../middleware/checkProAccess';
 import Forum from "../../models/Forum";
 import { validateUserAuthentication, validateForumData } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
-import { checkProAccess } from "../../utils/proAccessUtil";
 import { normalizeForumCategory } from "../../utils/forumCategory";
 
 // Middleware to validate authentication
@@ -43,13 +43,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (userAuthErrors.length > 0) {
       return res.status(400).json({ error: userAuthErrors[0] });
     }
-
-    // Check Pro access for the user - ALL forum creation requires Pro access
-    const hasProAccess = await checkProAccess(username);
-    if (!hasProAccess) {
-      return res.status(403).json({ error: 'Pro access required to create forums. Upgrade to Wingman Pro to create forums.' });
-    }
-
 
     // Validate forum data
     const forumData = {
@@ -128,4 +121,5 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withDatabase(handler);
+const PRO_ERROR = 'Pro access required to create forums. Upgrade to Wingman Pro to create forums.';
+export default withDatabase(withProAccess(handler, PRO_ERROR));
