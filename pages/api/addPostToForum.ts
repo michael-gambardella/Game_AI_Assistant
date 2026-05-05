@@ -76,6 +76,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
+    // Enforce post cap before any expensive work (content moderation, etc.)
+    const MAX_POSTS_PER_FORUM = 500;
+    if (forum.posts.length >= MAX_POSTS_PER_FORUM) {
+      return res.status(400).json({
+        error: 'Forum post limit reached',
+        details: `This forum has reached the maximum of ${MAX_POSTS_PER_FORUM} posts. Please create a new forum to continue the discussion.`
+      });
+    }
+
     // Validate replyTo if provided
     let replyToObjectId = null;
     if (replyTo) {

@@ -101,7 +101,13 @@ const ForumSchema = new mongoose.Schema({
     default: Date.now,
   },
   createdBy: { type: String, required: true },
-  posts: [PostSchema],
+  posts: {
+    type: [PostSchema],
+    validate: {
+      validator: (posts: unknown[]) => posts.length <= 500,
+      message: 'Forum cannot exceed 500 posts'
+    }
+  },
   metadata: {
     totalPosts: { type: Number, default: 0 },
     lastActivityAt: { type: Date, default: Date.now },
