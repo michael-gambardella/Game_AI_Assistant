@@ -1850,30 +1850,25 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         // Handle personalized daily gaming tip based on user history
         const Forum = (await import('../../models/Forum')).default;
 
-        // Fetch user's question history
-        const previousQuestionsRaw = await Question.find({ username })
-          .sort({ timestamp: -1 })
-          .limit(30)
-          .select('question detectedGame detectedGenre timestamp')
-          .lean() as unknown as Array<{
-            question: string;
-            detectedGame?: string;
-            detectedGenre?: string[];
-            timestamp: Date;
-          }>;
-
-        // Fetch user's forum activity (forums they created or posted in)
-        const userForums = await Forum.find({
-          $or: [
-            { createdBy: username },
-            { 'posts.username': username }
-          ]
-        })
-          .select('gameTitle posts')
-          .lean() as unknown as Array<{
-            gameTitle: string;
-            posts: Array<{ username: string; message: string }>;
-          }>;
+        // Fetch question history and forum activity in parallel — independent reads
+        const [previousQuestionsRaw, userForums] = await Promise.all([
+          Question.find({ username })
+            .sort({ timestamp: -1 })
+            .limit(30)
+            .select('question detectedGame detectedGenre timestamp')
+            .lean(),
+          Forum.find({
+            $or: [
+              { createdBy: username },
+              { 'posts.username': username }
+            ]
+          })
+            .select('gameTitle posts')
+            .lean()
+        ]) as unknown as [
+          Array<{ question: string; detectedGame?: string; detectedGenre?: string[]; timestamp: Date; }>,
+          Array<{ gameTitle: string; posts: Array<{ username: string; message: string }>; }>
+        ];
 
         // Extract games from questions
         const gamesFromQuestions = previousQuestionsRaw
