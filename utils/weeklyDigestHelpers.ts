@@ -647,6 +647,24 @@ export async function getWeeklyGameRecommendations(
       return result || gameName; // Fallback to original if empty
     };
 
+    // Checks whether a series is excluded, using prefix matching to handle cases where
+    // extractSeriesName produces different-length strings for the same franchise.
+    // Example: "Half-Life 2" → "half-life" (trailing number stripped), but
+    // "Half-Life 2: Episode Two" → "half-life 2" (number kept due to Episode rule).
+    // Without prefix matching, "half-life" !== "half-life 2" and both slip through.
+    // Prefix matching only activates when the shorter name has 2+ word-parts (split on
+    // space or hyphen), preventing single-word series like "halo" from matching "halo wars".
+    const isSeriesExcluded = (seriesLower: string, seen: Set<string>): boolean => {
+      if (seen.has(seriesLower)) return true;
+      for (const s of seen) {
+        const shorter = s.length <= seriesLower.length ? s : seriesLower;
+        const longer  = s.length <= seriesLower.length ? seriesLower : s;
+        const parts = shorter.split(/[\s-]+/).filter(Boolean);
+        if (parts.length >= 2 && longer.startsWith(shorter + ' ')) return true;
+      }
+      return false;
+    };
+
     // Step 11: Get all games user has asked about (for exclusion)
     // Optimize: Only fetch detectedGame field, and use lean() for better performance
     const allUserQuestions = await Question.find({ username })
@@ -741,7 +759,7 @@ export async function getWeeklyGameRecommendations(
 
           // Check if game is excluded
           const isExcludedGame = seenGames.has(gameLower);
-          const isExcludedSeries = seenSeries.has(seriesLower);
+          const isExcludedSeries = isSeriesExcluded(seriesLower, seenSeries);
 
           if (isExcludedGame) {
             const reason = gamesAskedAbout.has(gameLower) ? 'user asked about it' : 'previously recommended';
@@ -806,35 +824,29 @@ export async function getWeeklyGameRecommendations(
     const totalFetchDuration = Date.now() - genreFetchStartTime;
     console.log(`[Weekly Digest] ✅ All ${primaryGenres.length} genres fetched in parallel in ${totalFetchDuration}ms for ${username}`);
 
-    // Process results and add unique recommendations
+    // Process results - take 1 game per genre to guarantee each recommendation is from a different genre
     for (const result of genreResults) {
-      if (allRecommendations.length >= 8) break;
+      if (allRecommendations.length >= 5) break;
 
-      // Add unique recommendations (ensuring each is from a different series)
-      // Note: We push the full game name (rec) to recommendations, but use series name for duplicate checking
-      // Example: "Final Fantasy IX" is added to recommendations, but we track "Final Fantasy" in seenSeries
-      // This prevents "Final Fantasy VII" from being added in the same email, but shows the specific game name
       for (const rec of result.recommendations) {
-        if (allRecommendations.length >= 8) break;
         const recLower = rec.toLowerCase();
-        const series = extractSeriesName(rec); // Extract series name for duplicate checking
+        const series = extractSeriesName(rec);
         const seriesLower = series.toLowerCase();
 
-        // Check both game name and series name exclusions
         const isExcludedGame = seenGames.has(recLower);
-        const isExcludedSeries = seenSeries.has(seriesLower);
+        const isExcludedSeries = isSeriesExcluded(seriesLower, seenSeries);
 
         if (!isExcludedGame && !isExcludedSeries) {
-          allRecommendations.push(rec); // Push FULL game name (e.g., "Final Fantasy IX")
-          seenGames.add(recLower); // Track specific game to avoid exact duplicates
-          seenSeries.add(seriesLower); // Track series to prevent multiple games from same series
+          allRecommendations.push(rec);
+          seenGames.add(recLower);
+          seenSeries.add(seriesLower);
+          break; // One game per genre — ensures variety across all 5 recommendations
         } else {
-          // Log why it was excluded for debugging
           if (isExcludedGame) {
             const reason = gamesAskedAbout.has(recLower) ? 'user asked about it' : 'previously recommended';
             console.log(`[Weekly Digest] Skipped "${rec}" - ${reason}`);
           } else if (isExcludedSeries) {
-            console.log(`[Weekly Digest] Skipped "${rec}" - series "${series}" was previously recommended`);
+            console.log(`[Weekly Digest] Skipped "${rec}" - series "${series}" already in email or previously recommended`);
           }
         }
       }
@@ -876,7 +888,7 @@ export async function getWeeklyGameRecommendations(
             const seriesLower = series.toLowerCase().trim();
 
             const isExcludedGame = seenGames.has(gameLower);
-            const isExcludedSeries = seenSeries.has(seriesLower);
+            const isExcludedSeries = isSeriesExcluded(seriesLower, seenSeries);
 
             if (isExcludedGame) {
               const reason = gamesAskedAbout.has(gameLower) ? 'user asked about it' : 'previously recommended';
@@ -926,32 +938,29 @@ export async function getWeeklyGameRecommendations(
       const totalFallbackDuration = Date.now() - fallbackStartTime;
       console.log(`[Weekly Digest] ✅ All ${genresToTry.length} fallback genres fetched in parallel in ${totalFallbackDuration}ms for ${username}`);
 
-      // Process fallback results and add unique recommendations
+      // Process fallback results - take 1 game per fallback genre to maintain variety
       for (const result of fallbackResults) {
         if (allRecommendations.length >= 5) break;
 
         for (const rec of result.recommendations) {
-          if (allRecommendations.length >= 5) break;
-          const recLower = rec.toLowerCase().trim(); // Normalize: lowercase and trim whitespace
-          const series = extractSeriesName(rec); // Extract series name for duplicate checking
+          const recLower = rec.toLowerCase().trim();
+          const series = extractSeriesName(rec);
           const seriesLower = series.toLowerCase().trim();
 
-          // Check exclusion: must not be in seenGames (previously recommended or asked about)
-          // AND must not be from a series already in this email or previously recommended
           const isExcludedGame = seenGames.has(recLower);
-          const isExcludedSeries = seenSeries.has(seriesLower);
+          const isExcludedSeries = isSeriesExcluded(seriesLower, seenSeries);
 
           if (!isExcludedGame && !isExcludedSeries) {
-            allRecommendations.push(rec); // Push FULL game name (e.g., "Final Fantasy IX")
-            seenGames.add(recLower); // Track specific game to avoid exact duplicates
-            seenSeries.add(seriesLower); // Track series to prevent multiple games from same series
+            allRecommendations.push(rec);
+            seenGames.add(recLower);
+            seenSeries.add(seriesLower);
+            break; // One game per fallback genre — maintains variety
           } else {
-            // Log why a game was excluded for debugging
             if (isExcludedGame) {
               const reason = gamesAskedAbout.has(recLower) ? 'user asked about it' : 'previously recommended';
               console.log(`[Weekly Digest] Excluded "${rec}" (fallback) - ${reason}`);
             } else if (isExcludedSeries) {
-              console.log(`[Weekly Digest] Excluded "${rec}" (fallback) - series "${series}" was previously recommended or already in email`);
+              console.log(`[Weekly Digest] Excluded "${rec}" (fallback) - series "${series}" already in email or previously recommended`);
             }
           }
         }
