@@ -3,6 +3,7 @@ import { Schema } from 'mongoose';
 import User from '../models/User';
 import { ISplashUser } from '../types';
 import connectToMongoDB from './mongodb';
+import { PRO_DEADLINE, EARLY_ACCESS_START_DATE, EARLY_ACCESS_END_DATE } from './earlyAccessConfig';
 
 // SplashDB User schema
 // Explicitly set collection name to 'users' since that's where the data is stored in splash database
@@ -102,7 +103,7 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
     if (splashUser) {
       // Check deadline logic
       // Handle both old format (user-1762023949745) and new format (user-1762029860357-0f08c4)
-      const proDeadline = new Date('2025-12-31T23:59:59.999Z');
+      const proDeadline = PRO_DEADLINE;
       let signupDate: Date | null = null;
       if (splashUser.userId && splashUser.userId.includes('-')) {
         // Extract date from userId if possible
@@ -126,8 +127,8 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
       ) {
         // If user is eligible for early access, update their subscription data
         if (appUser && !appUser.subscription?.earlyAccessGranted) {
-          const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
-          const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+          const earlyAccessStartDate = EARLY_ACCESS_START_DATE;
+          const earlyAccessEndDate = EARLY_ACCESS_END_DATE;
           
           await AppUser.findOneAndUpdate(
             { _id: appUser._id },
@@ -392,9 +393,9 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
             console.log('Could not parse date from userId:', splashUser.userId);
           }
         }
-        const proDeadline = new Date('2025-12-31T23:59:59.999Z');
+        const proDeadline = PRO_DEADLINE;
         const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;
-        
+
         const shouldHaveProAccess = isEarlyUser || isBeforeDeadline || isApproved;
 
         // console.log('Existing user Pro access check:', {
@@ -412,8 +413,8 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
 
         // Always check and update Pro access if they should have it (to sync changes from splash database)
         if (shouldHaveProAccess) {
-          const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
-          const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+          const earlyAccessStartDate = EARLY_ACCESS_START_DATE;
+          const earlyAccessEndDate = EARLY_ACCESS_END_DATE;
           
           // Check if user needs subscription data update
           // Update if subscription doesn't exist, or if status is wrong, or if earlyAccessGranted is false
@@ -546,9 +547,9 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         }
       }
       
-      const proDeadline = new Date('2025-12-31T23:59:59.999Z');
-      const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
-      const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+      const proDeadline = PRO_DEADLINE;
+      const earlyAccessStartDate = EARLY_ACCESS_START_DATE;
+      const earlyAccessEndDate = EARLY_ACCESS_END_DATE;
       
       const isEarlyUser = (typeof splashUser.position === 'number' && splashUser.position <= 5000);
       const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;

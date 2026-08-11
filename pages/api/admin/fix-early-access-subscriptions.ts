@@ -5,6 +5,7 @@ import User from '../../../models/User';
 import { requireAdminAccess } from '../../../utils/adminAccess';
 import { Schema } from 'mongoose';
 import { ISplashUser } from '../../../types';
+import { PRO_DEADLINE, EARLY_ACCESS_START_DATE, EARLY_ACCESS_END_DATE } from '../../../utils/earlyAccessConfig';
 
 // SplashDB User schema (same as in proAccessUtil.ts)
 // Explicitly set collection name to 'users' since that's where the data is stored in splash database
@@ -60,8 +61,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       details: [] as Array<{ email: string; username: string; action: string; reason?: string }>
     };
 
-    const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
-    const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+    const earlyAccessStartDate = EARLY_ACCESS_START_DATE;
+    const earlyAccessEndDate = EARLY_ACCESS_END_DATE;
 
     for (const user of usersWithProAccess) {
       try {
@@ -109,7 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 // Ignore parse errors
               }
             }
-            const proDeadline = new Date('2025-12-31T23:59:59.999Z');
+            const proDeadline = PRO_DEADLINE;
             const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;
             
             shouldHaveEarlyAccess = isEarlyUser || isBeforeDeadline || isApproved;

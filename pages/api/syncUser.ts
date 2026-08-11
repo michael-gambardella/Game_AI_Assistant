@@ -4,6 +4,7 @@ import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { handleContentViolation } from '../../utils/violationHandler';
+import { PRO_DEADLINE, EARLY_ACCESS_START_DATE, EARLY_ACCESS_END_DATE } from '../../utils/earlyAccessConfig';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Allow both GET and POST for convenience
@@ -154,13 +155,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     
     // Check if user is eligible for early access and set up subscription
     if (updatedUser && !updatedUser.subscription?.earlyAccessGranted) {
-      const earlyAccessDeadline = new Date('2025-12-31T23:59:59.999Z');
+      const earlyAccessDeadline = PRO_DEADLINE;
       const currentDate = new Date();
-      
+
       // Check if user signed up before the deadline
       if (currentDate <= earlyAccessDeadline) {
-        const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
-        const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+        const earlyAccessStartDate = EARLY_ACCESS_START_DATE;
+        const earlyAccessEndDate = EARLY_ACCESS_END_DATE;
         
         // Update user with early access subscription
         await User.findOneAndUpdate(

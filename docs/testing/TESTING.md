@@ -268,7 +268,7 @@ This section outlines comprehensive testing procedures for the Video Game Wingma
 
 **Steps**:
 
-1. Create user with early access eligibility (before Dec 31, 2025)
+1. Create user with early access eligibility (before Dec 31, 2026 11:59:59 PM EST)
 2. Check subscription status is 'free_period'
 3. Verify early access dates are set correctly
 4. Confirm hasProAccess is true
@@ -276,8 +276,8 @@ This section outlines comprehensive testing procedures for the Video Game Wingma
 **Expected Results**:
 
 - `subscription.earlyAccessGranted: true`
-- `subscription.earlyAccessStartDate: 2025-12-31T23:59:59.999Z`
-- `subscription.earlyAccessEndDate: 2026-12-31T23:59:59.999Z`
+- `subscription.earlyAccessStartDate: 2027-01-01T04:59:59.999Z`
+- `subscription.earlyAccessEndDate: 2028-01-01T04:59:59.999Z`
 - `hasProAccess: true`
 
 ### 2. Pro Access Checking Testing

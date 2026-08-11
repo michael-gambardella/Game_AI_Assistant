@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx tsc *)",
+      "Bash(ls -la \"/c/Users/mgamb/game-wingman-splash-backend\" 2>&1 | head -50)",
+      "Read(//c/Users/mgamb/game-wingman-splash-backend/**)",
+      "Bash(ls -la \"/c/Users/mgamb/game-wingman-splash-frontend\" 2>&1 | head -50)",
+      "Read(//c/Users/mgamb/game-wingman-splash-frontend/**)"
     ]
   }
 }
