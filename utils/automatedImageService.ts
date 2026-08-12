@@ -534,7 +534,7 @@ export async function downloadAndStoreImage(
     });
     
     const imageBuffer = Buffer.from(response.data);
-    const contentType = response.headers['content-type'] || '';
+    const contentType = String(response.headers['content-type'] || '');
     
     // Validate file format
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
