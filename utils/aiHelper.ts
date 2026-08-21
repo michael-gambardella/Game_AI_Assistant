@@ -6,3 +6,4 @@ export * from './chatCompletion';
 export * from './recommendations';
 export * from './questionAnalysis';
 export * from './strategyTemplates';
+export * from './gameContext';

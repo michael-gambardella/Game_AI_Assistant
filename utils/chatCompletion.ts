@@ -287,7 +287,8 @@ export const getChatCompletionWithVision = async (
   question: string,
   imageUrl?: string,
   imageBase64?: string,
-  systemMessage?: string
+  systemMessage?: string,
+  maxTokens: number = 1000
 ): Promise<string | null> => {
   try {
     const messages: any[] = [
@@ -360,7 +361,7 @@ export const getChatCompletionWithVision = async (
     const completionParams: any = {
       model: visionModel,
       messages: messages as any,
-      max_completion_tokens: 1000,
+      max_completion_tokens: maxTokens,
       temperature: 0.7, // Vision models support temperature
     };
 
@@ -409,15 +410,16 @@ export const getChatCompletionWithVision = async (
 };
 
 // Get chat completion for user questions
-export const getChatCompletion = async (question: string, systemMessage?: string): Promise<string | null> => {
+export const getChatCompletion = async (question: string, systemMessage?: string, maxTokens: number = 800): Promise<string | null> => {
   try {
     // Normalize question for cache key (lowercase, trim) to match usage in assistant.ts
     // This ensures consistent cache keys across the codebase
     const normalizedQuestion = question.toLowerCase().trim();
     const normalizedSystemMessage = (systemMessage || 'default').toLowerCase().trim();
     
-    // Generate a cache key based on the normalized question and system message
-    const cacheKey = `chat:${normalizedQuestion}:${normalizedSystemMessage}`;
+    // Generate a cache key based on the normalized question, system message, and token limit
+    // (systemMessage differences already cover most cases, but maxTokens can differ independently)
+    const cacheKey = `chat:${normalizedQuestion}:${normalizedSystemMessage}:${maxTokens}`;
     
     // Check if we have a cached response
     const cachedResponse = aiCache.get(cacheKey);
@@ -791,7 +793,7 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
           { role: 'system' as const, content: enhancedSystemMessage },
           { role: 'user' as const, content: enhancedQuestion },
         ],
-        max_completion_tokens: 800,
+        max_completion_tokens: maxTokens,
       };
       const reqOpts = openaiRequestOptionsForModel(modelSelection.model);
       const completion = reqOpts

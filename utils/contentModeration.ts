@@ -508,7 +508,6 @@ const OFFENSIVE_WORDS = [
   'bulge',
   'Under Seige',
   'The Art of the Deal',
-  'Aligator Alcatraz',
   'Let\'s Go Brandon',
   'Truth Social',
   'Young Republicans',

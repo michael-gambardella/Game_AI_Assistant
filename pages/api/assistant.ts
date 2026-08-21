@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext, shouldRunAnalysis, extractGameTitleFromQuestion } from '../../utils/aiHelper';
+import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext, shouldRunAnalysis, extractGameTitleFromQuestion, getCurrentGameContext } from '../../utils/aiHelper';
 import { storeUserPatterns } from '../../utils/storeUserPatterns';
 import { generatePersonalizedRecommendations } from '../../utils/generateRecommendations';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
@@ -22,7 +22,6 @@ import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
 import { withRequestSizeLimit } from '../../middleware/requestSizeLimit';
 import { LRUCache, cacheManager } from '../../utils/cacheManager';
 import { ImageAnnotatorClient } from '@google-cloud/vision';
-import { fetchRecentlyPlayedGames } from '../../utils/steamAPI';
 
 // Module-level singleton for Google Vision client — avoids re-parsing credentials
 // and re-instantiating the client on every image request.
@@ -1456,28 +1455,19 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     // Load the user to update streak/usage data later
     const user = await User.findOne({ username });
 
-    // Fetch Steam recently played games if the user has linked their Steam account.
-    // Injected as context so the AI can give more relevant answers without the user
-    // having to specify what they've been playing.
-    let steamRecentGamesContext = '';
-    if (user?.steamId) {
+    // Build "what is this user currently playing" context (explicit gameTracking.currentlyPlaying,
+    // falling back to/merging with Steam recently-played) so the AI can give relevant answers
+    // without the user having to restate the game every time (Quest Companion).
+    let currentGameContext = '';
+    let currentGamePrimary: string | undefined;
+    if (user) {
       try {
-        const recentGames = await fetchRecentlyPlayedGames(user.steamId);
-        if (recentGames && recentGames.length > 0) {
-          const gameList = recentGames.map(g => {
-            const totalHours = Math.round(g.playtime_forever / 60);
-            if (g.playtime_2weeks > 0) {
-              const recentHours = (g.playtime_2weeks / 60).toFixed(1);
-              return `${g.name} (${recentHours}h this week, ${totalHours}h total)`;
-            }
-            return totalHours > 0 ? `${g.name} (${totalHours}h total)` : g.name;
-          }).join(', ');
-          steamRecentGamesContext = `[Steam Context: This user has recently been playing: ${gameList}. When suggesting games, prioritize titles in the same or closely related game types as the games listed above. Do NOT suggest generic "best games" lists — tailor suggestions specifically to the game types and styles of the user's recent games.]`;
-        }
-        // If recentGames is an empty array the profile is private or inactive — skip silently
-      } catch (steamError) {
-        // Never let Steam API failures block question answering
-        logger.warn('Could not fetch Steam recently played games', { username });
+        const gameContext = await getCurrentGameContext(user);
+        currentGameContext = gameContext.contextString;
+        currentGamePrimary = gameContext.primaryGame;
+      } catch (contextError) {
+        // Never let context-building failures block question answering
+        logger.warn('Could not build current game context', { username });
       }
     }
 
@@ -1918,7 +1908,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         });
 
         return personalizedTip || "Here's a daily gaming tip: Take regular breaks every 45-60 minutes to keep your mind sharp and avoid fatigue. Your performance actually improves when you give yourself time to rest!";
-      } else if (!steamRecentGamesContext && questionToProcess.toLowerCase().includes("recommendations")) {
+      } else if (!currentGameContext && questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
@@ -1967,7 +1957,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         const userDataCacheKey = `twitch_user:${accessToken}`;
         const userData = await deduplicateRequest(userDataCacheKey, () => getTwitchUserData(accessToken));
         return `Twitch User Data: ${JSON.stringify(userData)}`;
-      } else if (!steamRecentGamesContext && questionToProcess.toLowerCase().includes("genre") &&
+      } else if (!currentGameContext && questionToProcess.toLowerCase().includes("genre") &&
         !questionToProcess.toLowerCase().includes("level") &&
         !questionToProcess.toLowerCase().includes("stage") &&
         !questionToProcess.toLowerCase().includes("item")) {
@@ -2012,13 +2002,24 @@ CRITICAL INSTRUCTIONS:
 7. If you can identify specific visual features (like "neon pink Eggman face Ferris wheel" or "tall green-lit industrial towers"), use those to pinpoint the exact level`;
         }
 
-        // Inject Steam context into the system message so it informs the AI
+        // Inject current-game context into the system message so it informs the AI
         // without polluting the question text (which would cause false game title extractions)
-        if (steamRecentGamesContext) {
+        if (currentGameContext) {
           systemMessage = systemMessage
-            ? `${systemMessage}\n\n${steamRecentGamesContext}`
-            : steamRecentGamesContext;
+            ? `${systemMessage}\n\n${currentGameContext}`
+            : currentGameContext;
         }
+
+        // Quest Companion: when we already know what game the user is playing and this
+        // isn't an explicit request for a full guide, answer briefly (mid-session glance,
+        // not a walkthrough to read) instead of the default long-form ## Heading format.
+        const isGuideRequest = /\b(guide|walkthrough|full strategy|step[- ]by[- ]step|complete guide)\b/i.test(questionToProcess);
+        const isQuickCompanionMode = !!currentGamePrimary && !isGuideRequest;
+        if (isQuickCompanionMode) {
+          const quickInstruction = `Answer conversationally in 2-4 short sentences, like you're quickly telling a friend who's mid-game and needs a fast answer. Do NOT use ## headings or bullet lists for this kind of quick question.`;
+          systemMessage = systemMessage ? `${systemMessage}\n\n${quickInstruction}` : quickInstruction;
+        }
+        const answerMaxTokens = isQuickCompanionMode ? 300 : undefined;
 
         let baseAnswer: string;
 
@@ -2048,7 +2049,8 @@ CRITICAL INSTRUCTIONS:
                     questionToProcess,
                     imageForVision?.startsWith('http') ? imageForVision : undefined,
                     imageForVision?.startsWith('data:') ? imageForVision : undefined,
-                    systemMessage
+                    systemMessage,
+                    answerMaxTokens
                   )),
                   visionTimeoutPromise // Use longer timeout for vision API calls
                 ]);
@@ -2071,7 +2073,7 @@ CRITICAL INSTRUCTIONS:
               // Fallback to text-only if image conversion fails
               try {
                 const raceResult = await Promise.race([
-                  deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+                  deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
                   timeoutPromise
                 ]);
                 // Cancel timeout IMMEDIATELY after race completes (synchronously)
@@ -2092,7 +2094,7 @@ CRITICAL INSTRUCTIONS:
               // Create a new timeout for the fallback (30s to match main timeout)
               const fallbackTimeout = createTimeoutPromise(30000, 'Request timeout');
               baseAnswer = await Promise.race([
-                deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+                deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
                 fallbackTimeout.promise
               ]) as string;
               // Cancel timeout since request completed successfully
@@ -2111,7 +2113,7 @@ CRITICAL INSTRUCTIONS:
           // No image, use text-only API
           try {
             const raceResult = await Promise.race([
-              deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+              deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
               timeoutPromise
             ]);
             // Cancel timeout IMMEDIATELY after race completes (synchronously)
@@ -2144,9 +2146,9 @@ CRITICAL INSTRUCTIONS:
           );
         }
 
-        // Skip RAWG/IGDB lookup when the answer is based on Steam context —
+        // Skip RAWG/IGDB lookup when the answer is based on current-game context —
         // searching by question text returns irrelevant results in that case.
-        if (steamRecentGamesContext) {
+        if (currentGameContext) {
           return baseAnswer;
         }
 
