@@ -1,4 +1,4 @@
-﻿import { getOpenAIClient, openaiRequestOptionsForModel, aiCache } from './openaiClient';
+﻿import { getOpenAIClient, openaiRequestOptionsForModel, modelSupportsCustomTemperature, reasoningEffortForModel, aiCache } from './openaiClient';
 import { fetchFromIGDB, fetchFromRAWG, fetchVersionInfo, fetchSeriesFromIGDB, fetchSeriesFromRAWG, fetchGameLevelsFromIGDB, fetchGameDetailsFromRAWG } from './gameMetadata';
 import { selectModelForQuestion, modelUsageStats } from './modelSelection';
 import { extractGameTitleFromQuestion } from './gameTitleExtractor';
@@ -53,7 +53,6 @@ Provide only the game title. If you cannot identify it with confidence, respond 
       modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
       
       // Use OpenAI to identify the game from the image description
-      // Note: gpt-4o-search-preview doesn't support temperature parameter
       const completionParams: any = {
         model: modelSelection.model,
         messages: [
@@ -68,12 +67,17 @@ Provide only the game title. If you cannot identify it with confidence, respond 
         ],
         max_completion_tokens: 100,
       };
-      
-      // Only include temperature for models that support it
-      if (modelSelection.model !== 'gpt-4o-search-preview') {
+
+      // Only some models accept a custom temperature (others 400 on anything but the default)
+      if (modelSupportsCustomTemperature(modelSelection.model)) {
         completionParams.temperature = 0.3; // Lower temperature for more consistent identification
       }
-      
+      // Reasoning models burn their whole token budget on hidden reasoning unless told not to
+      const reasoningEffort = reasoningEffortForModel(modelSelection.model);
+      if (reasoningEffort) {
+        completionParams.reasoning_effort = reasoningEffort;
+      }
+
       const reqOpts = openaiRequestOptionsForModel(modelSelection.model);
       const completion = reqOpts
         ? await getOpenAIClient().chat.completions.create(completionParams, reqOpts)
@@ -267,6 +271,34 @@ Compare these specific visual details against your knowledge of the game's level
   return `${question}\n\n[Context for identification: ${contextParts.join('. ')}]`;
 }
 
+/**
+ * Resolve which game a question is "about" when a Quest Companion known-game context
+ * is available. Per-question extraction (extractGameTitleFromQuestion) can mis-fire on
+ * boss/item/character names embedded in the question (e.g. "Avalanche Abaasy" getting
+ * fuzzy-matched down to an unrelated 1981 game called "Avalanche") — when that happens it
+ * actively fights the "assume it's about the game you're playing" instruction already in
+ * the system message. Trust the known game unless the extracted title clearly agrees with
+ * it, or the question explicitly quotes a different title.
+ */
+function resolveGameTitleForContext(
+  extractedGameTitle: string | undefined,
+  knownGameTitle: string | undefined,
+  question: string
+): string | undefined {
+  if (!knownGameTitle) return extractedGameTitle;
+  if (!extractedGameTitle) return knownGameTitle;
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normExtracted = normalize(extractedGameTitle);
+  const normKnown = normalize(knownGameTitle);
+  const agrees = normExtracted.includes(normKnown) || normKnown.includes(normExtracted);
+  if (agrees) return extractedGameTitle;
+
+  const escaped = extractedGameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const explicitlyQuoted = new RegExp(`["']${escaped}["']`, 'i').test(question);
+  return explicitlyQuoted ? extractedGameTitle : knownGameTitle;
+}
+
 // Extract series name from question
 function extractSeriesName(question: string): string | null {
   const seriesPattern = /list all of the games in the (.+?) series/i;
@@ -327,37 +359,30 @@ export const getChatCompletionWithVision = async (
       text: question
     });
 
-    // For vision requests, we MUST use a model that supports images
-    // gpt-4o-search-preview does NOT support image inputs
-    // Use gpt-4o or gpt-4o-mini for vision requests instead
+    // For vision requests, we MUST use a model that supports images AND a custom
+    // temperature (this function always sends temperature: 0.7 below).
+    // gpt-5.6-terra / gpt-5-search-api support neither, so vision always routes to gpt-4o/mini.
     const VISION_MODELS = {
       'gpt-4o': 'gpt-4o',           // Full vision support
       'gpt-4o-mini': 'gpt-4o-mini', // Full vision support, cheaper
-      'gpt-5.2': 'gpt-5.2'          // If available, supports vision
     };
-    
-    // Select model based on game release date (extract from question if possible)
+
     const modelSelection = await selectModelForQuestion(undefined, question);
-    
+
     // Override to vision-capable model if the selected model doesn't support images
     let visionModel = modelSelection.model;
-    if (visionModel === 'gpt-4o-search-preview') {
-      // Fallback to gpt-4o for vision (it supports images and has good knowledge)
-      visionModel = 'gpt-4o';
-      console.log(`[Model Selection] Overriding to gpt-4o for vision request (gpt-4o-search-preview doesn't support images)`);
-    } else if (!Object.values(VISION_MODELS).includes(visionModel as any)) {
+    if (!Object.values(VISION_MODELS).includes(visionModel as any)) {
       // If selected model isn't in our vision-capable list, use gpt-4o as safe default
       visionModel = 'gpt-4o';
       console.log(`[Model Selection] Overriding to gpt-4o for vision request (${modelSelection.model} may not support images)`);
     }
-    
+
     // Log model selection for monitoring
     console.log(`[Model Selection] Using ${visionModel} for vision request (reason: ${modelSelection.reason}, original: ${modelSelection.model})`);
-    
+
     // Track model usage
     modelUsageStats[visionModel] = (modelUsageStats[visionModel] || 0) + 1;
 
-    // Note: gpt-4o-search-preview doesn't support temperature parameter, but we're not using it for vision
     const completionParams: any = {
       model: visionModel,
       messages: messages as any,
@@ -410,16 +435,16 @@ export const getChatCompletionWithVision = async (
 };
 
 // Get chat completion for user questions
-export const getChatCompletion = async (question: string, systemMessage?: string, maxTokens: number = 800): Promise<string | null> => {
+export const getChatCompletion = async (question: string, systemMessage?: string, maxTokens: number = 800, knownGameTitle?: string): Promise<string | null> => {
   try {
     // Normalize question for cache key (lowercase, trim) to match usage in assistant.ts
     // This ensures consistent cache keys across the codebase
     const normalizedQuestion = question.toLowerCase().trim();
     const normalizedSystemMessage = (systemMessage || 'default').toLowerCase().trim();
-    
-    // Generate a cache key based on the normalized question, system message, and token limit
-    // (systemMessage differences already cover most cases, but maxTokens can differ independently)
-    const cacheKey = `chat:${normalizedQuestion}:${normalizedSystemMessage}:${maxTokens}`;
+
+    // Generate a cache key based on the normalized question, system message, token limit, and known game
+    // (systemMessage differences already cover most cases, but these can differ independently)
+    const cacheKey = `chat:${normalizedQuestion}:${normalizedSystemMessage}:${maxTokens}:${(knownGameTitle || '').toLowerCase().trim()}`;
     
     // Check if we have a cached response
     const cachedResponse = aiCache.get(cacheKey);
@@ -469,7 +494,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
     
     // For factual metadata questions, try IGDB/RAWG first (they have accurate metadata)
     if (isMetadataQuestion && !isSpecificQuestion) {
-      const extractedGameTitle = await extractGameTitleFromQuestion(question);
+      const extractedGameTitle = resolveGameTitleForContext(await extractGameTitleFromQuestion(question), knownGameTitle, question);
       const searchQuery = extractedGameTitle || question;
       
       // Limit search query to 255 characters (IGDB limit) and extract just the game title part
@@ -633,7 +658,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
       
       // For metadata questions with questionable/missing API results, use OpenAI with enhanced prompt
       if (isMetadataQuestion && !isSpecificQuestion && (apiResultQuality === 'questionable' || !response)) {
-        const extractedGameTitle = await extractGameTitleFromQuestion(question);
+        const extractedGameTitle = resolveGameTitleForContext(await extractGameTitleFromQuestion(question), knownGameTitle, question);
         gameTitleForContext = extractedGameTitle;
         
         if (extractedGameTitle) {
@@ -707,7 +732,7 @@ Now please provide a detailed, accurate answer about "${extractedGameTitle}" bas
 Please provide accurate, factual information. Make sure to identify the correct game title from the question and answer about that specific game. If the question mentions a remake, remaster, or sequel, make sure your answer is about that specific version.`;
         }
       } else if (isSpecificQuestion) {
-        const extractedGameTitle = await extractGameTitleFromQuestion(question);
+        const extractedGameTitle = resolveGameTitleForContext(await extractGameTitleFromQuestion(question), knownGameTitle, question);
         gameTitleForContext = extractedGameTitle;
         
         // Check if this is a version comparison question
@@ -787,6 +812,7 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
       // Track model usage
       modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
       
+      const reasoningEffort = reasoningEffortForModel(modelSelection.model);
       const completionParams = {
         model: modelSelection.model,
         messages: [
@@ -794,6 +820,7 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
           { role: 'user' as const, content: enhancedQuestion },
         ],
         max_completion_tokens: maxTokens,
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       };
       const reqOpts = openaiRequestOptionsForModel(modelSelection.model);
       const completion = reqOpts
@@ -802,13 +829,14 @@ ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTit
 
       response = completion.choices[0].message.content;
 
-      // If primary model returned no content, fall back to gpt-4o-search-preview
-      // (which can browse the web for very new games the primary model may not know)
-      if (!response && modelSelection.model !== 'gpt-4o-search-preview') {
-        console.log(`[Model Selection] ${modelSelection.model} returned no content, falling back to gpt-4o-search-preview`);
+      // If primary model returned no content, fall back to gpt-4o as a safety net
+      if (!response && modelSelection.model !== 'gpt-4o') {
+        console.log(`[Model Selection] ${modelSelection.model} returned no content, falling back to gpt-4o`);
+        // gpt-4o rejects reasoning_effort outright (400), so strip it before falling back
+        const { reasoning_effort: _omit, ...fallbackParams } = completionParams as typeof completionParams & { reasoning_effort?: string };
         const fallbackCompletion = await getOpenAIClient().chat.completions.create(
-          { ...completionParams, model: 'gpt-4o-search-preview' },
-          { timeout: 120_000, maxRetries: 0 }
+          { ...fallbackParams, model: 'gpt-4o' },
+          { timeout: 28_000, maxRetries: 0 }
         );
         response = fallbackCompletion.choices[0].message.content;
       }

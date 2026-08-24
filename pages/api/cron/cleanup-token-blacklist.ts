@@ -18,10 +18,10 @@ import { cleanupExpiredBlacklistEntries, getBlacklistStats } from '../../../util
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Optional: Add authentication check
-  // const authHeader = req.headers.authorization;
-  // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return res.status(401).json({ error: 'Unauthorized' });
-  // }
+  const authHeader = req.headers.authorization;
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   // Allow both GET and POST for flexibility with different cron services
   if (req.method !== 'GET' && req.method !== 'POST') {

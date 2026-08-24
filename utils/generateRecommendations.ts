@@ -1752,8 +1752,8 @@ ${specificPlatform ? `Focus on whether this game has achievements SPECIFICALLY o
 
 Respond with ONLY "YES" or "NO" - nothing else.`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-search-preview',
+    const completionParams: any = {
+      model: 'gpt-5.6-terra',
       messages: [
         {
           role: 'system',
@@ -1764,9 +1764,10 @@ Respond with ONLY "YES" or "NO" - nothing else.`;
           content: prompt
         }
       ],
-      max_tokens: 10,
-      // Note: gpt-4o-search-preview doesn't support temperature parameter
-    });
+      max_completion_tokens: 10,
+      reasoning_effort: 'none', // gpt-5.6-terra burns its whole token budget on hidden reasoning otherwise
+    };
+    const completion = await openai.chat.completions.create(completionParams);
 
     const response = completion.choices[0].message.content?.trim().toUpperCase();
     return response === 'YES';

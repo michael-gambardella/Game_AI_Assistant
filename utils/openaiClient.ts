@@ -16,28 +16,50 @@ export function getOpenAIClient(): OpenAI {
     }
     openaiInstance = new OpenAI({
       apiKey: apiKey,
-      timeout: 28000, // Default for fast models; gpt-4o-search-preview uses a longer per-request timeout (see openaiRequestOptionsForModel)
+      timeout: 28000, // Default for fast models; some models use a longer per-request timeout (see openaiRequestOptionsForModel)
       maxRetries: 1, // Reduce retries to avoid compounding delays
     });
   }
   return openaiInstance;
 }
 
-/** gpt-4o-search-preview runs browsing/search and often exceeds the default client timeout. */
-const OPENAI_SEARCH_PREVIEW_TIMEOUT_MS = 120_000;
+/** gpt-5.6-terra (reasoning) and gpt-5-search-api (browsing) can take longer per request than the default client timeout. */
+const OPENAI_EXTENDED_TIMEOUT_MS = 120_000;
+const EXTENDED_TIMEOUT_MODELS = new Set(['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5-search-api']);
 
 /**
  * Per-request options for models that need more time. Avoids doubling wall-clock on timeout
  * (SDK retries timeouts by default).
  */
 export function openaiRequestOptionsForModel(model: string | undefined): { timeout: number; maxRetries: number } | undefined {
-  if (model === 'gpt-4o-search-preview') {
-    return { timeout: OPENAI_SEARCH_PREVIEW_TIMEOUT_MS, maxRetries: 0 };
-  }
-  if (model === 'gpt-5.2') {
-    return { timeout: OPENAI_SEARCH_PREVIEW_TIMEOUT_MS, maxRetries: 0 };
+  if (model && EXTENDED_TIMEOUT_MODELS.has(model)) {
+    return { timeout: OPENAI_EXTENDED_TIMEOUT_MS, maxRetries: 0 };
   }
   return undefined;
+}
+
+/**
+ * Models confirmed to accept a custom `temperature` value. gpt-5.6-terra and
+ * gpt-5-search-api reject anything but the default (1) — passing temperature to
+ * them 400s the request, so callers must check this before setting it.
+ */
+const CUSTOM_TEMPERATURE_MODELS = new Set(['gpt-4o', 'gpt-4o-mini']);
+
+export function modelSupportsCustomTemperature(model: string | undefined): boolean {
+  return !!model && CUSTOM_TEMPERATURE_MODELS.has(model);
+}
+
+/**
+ * gpt-5.6 models (reasoning models) burn their ENTIRE max_completion_tokens budget on
+ * hidden reasoning tokens by default, regardless of budget size, leaving zero tokens for
+ * visible output (finish_reason: 'length', empty content) — confirmed empirically at
+ * 300/500/800 token caps. Passing reasoning_effort: 'none' fixes this and lets the model
+ * actually answer. gpt-5-search-api does NOT accept this param at all (400s if sent).
+ */
+const NO_REASONING_EFFORT_MODELS = new Set(['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-5.6-luna']);
+
+export function reasoningEffortForModel(model: string | undefined): 'none' | undefined {
+  return model && NO_REASONING_EFFORT_MODELS.has(model) ? 'none' : undefined;
 }
 
 export class AICacheMetrics {

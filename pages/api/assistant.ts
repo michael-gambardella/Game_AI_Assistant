@@ -2073,7 +2073,7 @@ CRITICAL INSTRUCTIONS:
               // Fallback to text-only if image conversion fails
               try {
                 const raceResult = await Promise.race([
-                  deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
+                  deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens, currentGamePrimary)),
                   timeoutPromise
                 ]);
                 // Cancel timeout IMMEDIATELY after race completes (synchronously)
@@ -2094,7 +2094,7 @@ CRITICAL INSTRUCTIONS:
               // Create a new timeout for the fallback (30s to match main timeout)
               const fallbackTimeout = createTimeoutPromise(30000, 'Request timeout');
               baseAnswer = await Promise.race([
-                deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
+                deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens, currentGamePrimary)),
                 fallbackTimeout.promise
               ]) as string;
               // Cancel timeout since request completed successfully
@@ -2113,7 +2113,7 @@ CRITICAL INSTRUCTIONS:
           // No image, use text-only API
           try {
             const raceResult = await Promise.race([
-              deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens)),
+              deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage, answerMaxTokens, currentGamePrimary)),
               timeoutPromise
             ]);
             // Cancel timeout IMMEDIATELY after race completes (synchronously)

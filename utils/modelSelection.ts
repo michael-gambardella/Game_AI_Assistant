@@ -296,13 +296,18 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
   return requestPromise;
 }
 
+// GPT-5.6 Terra's trained-knowledge cutoff. Games releasing after this date
+// aren't reliably in its training data, so route those (and anything else we're
+// not confident about) to the search-capable model instead.
+const TERRA_KNOWLEDGE_CUTOFF = new Date('2026-02-16');
+
 /**
- * Determine which OpenAI model to use based on game release date
- * - GPT-5.2 for games released 2024+ (better knowledge - cutoff Aug 2025 vs Apr 2024)
- * - GPT-4o for games released before 2024 (proven quality, cost-effective)
+ * Determine which OpenAI model to use for a question.
  *
- * Rationale: GPT-5.2 has knowledge through August 2025, making it much better
- * for newer games, but costs ~24% more with typical 1:2 input/output ratio.
+ * Two-tier: gpt-5.6-terra (no live search, but cheaper/faster) for games we can
+ * confidently identify and date within its knowledge cutoff; gpt-5-search-api
+ * (can browse the web) for anything uncertain — no game detected, release date
+ * unavailable, or a game releasing after Terra's knowledge cutoff.
  *
  * @param gameTitle - Optional game title to check release date
  * @param question - Question text (fallback if no game title)
@@ -312,8 +317,8 @@ export async function selectModelForQuestion(
   gameTitle?: string,
   question?: string
 ): Promise<ModelSelectionResult> {
-  const CUTOFF_YEAR = 2024; // Games released 2024+ use GPT-5.2 (better knowledge cutoff)
-  const DEFAULT_MODEL = 'gpt-4o-search-preview'; // Safe default
+  const PRIMARY_MODEL = 'gpt-5.6-terra';
+  const SEARCH_MODEL = 'gpt-5-search-api';
 
   // If no game title, try to extract from question
   let detectedGame = gameTitle;
@@ -321,10 +326,10 @@ export async function selectModelForQuestion(
     detectedGame = await extractGameTitleFromQuestion(question);
   }
 
-  // If still no game, use default model
+  // If still no game, we can't tell if it's something Terra would know — use search
   if (!detectedGame) {
     return {
-      model: DEFAULT_MODEL,
+      model: SEARCH_MODEL,
       reason: 'no_game_detected'
     };
   }
@@ -336,42 +341,40 @@ export async function selectModelForQuestion(
     if (releaseDate) {
       const releaseYear = releaseDate.getFullYear();
 
-      // For remakes, the release date will be the remake date (already handled by API)
-      // This ensures "Resident Evil 4 Remake" uses remake date (2023), not original (2005)
-
-      if (releaseYear >= CUTOFF_YEAR) {
+      if (releaseDate > TERRA_KNOWLEDGE_CUTOFF) {
         return {
-          model: 'gpt-5.2',
-          reason: `game_released_${releaseYear}`,
-          releaseDate: releaseDate,
-          releaseYear: releaseYear
-        };
-      } else {
-        return {
-          model: DEFAULT_MODEL,
-          reason: `game_released_${releaseYear}`,
-          releaseDate: releaseDate,
-          releaseYear: releaseYear
+          model: SEARCH_MODEL,
+          reason: `game_released_${releaseYear}_after_cutoff`,
+          releaseDate,
+          releaseYear
         };
       }
+
+      return {
+        model: PRIMARY_MODEL,
+        reason: `game_released_${releaseYear}`,
+        releaseDate,
+        releaseYear
+      };
     }
   } catch (error) {
     console.error('[Model Selection] Error in selectModelForQuestion:', error);
   }
 
-  // Default to 4o if we can't determine release date
+  // Couldn't determine a release date (obscure/misidentified title) — use search
+  // rather than guessing with a model that may not know about it.
   return {
-    model: DEFAULT_MODEL,
+    model: SEARCH_MODEL,
     reason: 'release_date_unavailable'
   };
 }
 
 // Track model usage for cost monitoring
 export const modelUsageStats: { [key: string]: number } = {
-  'gpt-4o-search-preview': 0,
   'gpt-4o': 0,
   'gpt-4o-mini': 0,
-  'gpt-5.2': 0
+  'gpt-5.6-terra': 0,
+  'gpt-5-search-api': 0
 };
 
 /**
@@ -385,8 +388,8 @@ export function getModelUsageStats() {
  * Reset model usage statistics
  */
 export function resetModelUsageStats() {
-  modelUsageStats['gpt-4o-search-preview'] = 0;
   modelUsageStats['gpt-4o'] = 0;
   modelUsageStats['gpt-4o-mini'] = 0;
-  modelUsageStats['gpt-5.2'] = 0;
+  modelUsageStats['gpt-5.6-terra'] = 0;
+  modelUsageStats['gpt-5-search-api'] = 0;
 }

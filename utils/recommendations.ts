@@ -1,5 +1,5 @@
 ﻿import { externalApiClient } from './axiosConfig';
-import { getOpenAIClient, openaiRequestOptionsForModel } from './openaiClient';
+import { getOpenAIClient, openaiRequestOptionsForModel, reasoningEffortForModel } from './openaiClient';
 import { selectModelForQuestion, modelUsageStats } from './modelSelection';
 // Analyze user questions and map them to game genres
 export const analyzeUserQuestions = (questions: Array<{ question: string, response: string }>): string[] => {
@@ -303,6 +303,7 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
           // Track model usage
           modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
           
+          const beginnerReasoningEffort = reasoningEffortForModel(modelSelection.model);
           const beginnerFilterParams = {
             model: modelSelection.model,
             messages: [
@@ -315,7 +316,8 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
                 content: aiPrompt
               }
             ],
-            max_tokens: 500
+            max_completion_tokens: 500,
+            ...(beginnerReasoningEffort ? { reasoning_effort: beginnerReasoningEffort } : {})
           };
           const beginnerOpts = openaiRequestOptionsForModel(modelSelection.model);
           const aiResponse = beginnerOpts
@@ -427,13 +429,13 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
-          // For recommendation filtering with currentPopular=true, use GPT-5.2 for better knowledge of recent games
+          // For recommendation filtering with currentPopular=true, use gpt-5.6-terra for better knowledge of recent games
           // For other cases, use default model (4o) since we're filtering a list
           let modelSelection;
           if (currentPopular) {
-            // Use GPT-5.2 for current/popular games to leverage better knowledge cutoff (Aug 2025 vs Apr 2024)
+            // Use gpt-5.6-terra for current/popular games to leverage its Feb 2026 knowledge cutoff
             modelSelection = {
-              model: 'gpt-5.2',
+              model: 'gpt-5.6-terra',
               reason: 'current_popular_games_need_recent_knowledge'
             };
           } else {
@@ -447,6 +449,7 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
           // Track model usage
           modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
           
+          const popularReasoningEffort = reasoningEffortForModel(modelSelection.model);
           const popularFilterParams = {
             model: modelSelection.model,
             messages: [
@@ -459,7 +462,8 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
                 content: aiPrompt
               }
             ],
-            max_tokens: 600
+            max_completion_tokens: 600,
+            ...(popularReasoningEffort ? { reasoning_effort: popularReasoningEffort } : {})
           };
           const popularOpts = openaiRequestOptionsForModel(modelSelection.model);
           const aiResponse = popularOpts
