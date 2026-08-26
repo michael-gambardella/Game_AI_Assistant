@@ -30,6 +30,9 @@ import { trackQuestionAsked } from "../utils/analytics";
 import { getSourceName } from "../utils/linkShortener";
 // import { useRouter } from "next/navigation";
 
+const STRATEGY_ADVISOR_PROMPT =
+  "Analyze this screenshot and give me strategic advice — what's dangerous, what's the opportunity, and what should I do next?";
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState("");
@@ -2593,49 +2596,73 @@ export default function Home() {
                         />
                       </label>
                       {imageUrl && (
-                        <div className="relative inline-block">
-                          <Image
-                            src={imageUrl}
-                            alt="Selected screenshot"
-                            width={200}
-                            height={200}
-                            className="rounded border border-gray-300 dark:border-gray-600"
-                            unoptimized={
-                              imageUrl.startsWith("http") ||
-                              imageUrl.startsWith("//") ||
-                              imageUrl.startsWith("blob:")
-                            }
-                          />
+                        <>
+                          <div className="relative inline-block">
+                            <Image
+                              src={imageUrl}
+                              alt="Selected screenshot"
+                              width={200}
+                              height={200}
+                              className="rounded border border-gray-300 dark:border-gray-600"
+                              unoptimized={
+                                imageUrl.startsWith("http") ||
+                                imageUrl.startsWith("//") ||
+                                imageUrl.startsWith("blob:")
+                              }
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImage(null);
+                                setImageUrl(null);
+                                // Reset file input
+                                const fileInput = document.getElementById(
+                                  "question-image-upload"
+                                ) as HTMLInputElement;
+                                if (fileInput) fileInput.value = "";
+                              }}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-75 hover:opacity-100 transition-opacity"
+                              aria-label="Remove image"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={() => {
-                              setImage(null);
-                              setImageUrl(null);
-                              // Reset file input
-                              const fileInput = document.getElementById(
-                                "question-image-upload"
-                              ) as HTMLInputElement;
-                              if (fileInput) fileInput.value = "";
+                              setQuestion(STRATEGY_ADVISOR_PROMPT);
+                              setTimeout(() => {
+                                const input = document.querySelector(
+                                  'input[type="text"]'
+                                ) as HTMLInputElement;
+                                if (input) {
+                                  input.focus();
+                                  input.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "center",
+                                  });
+                                }
+                              }, 100);
                             }}
-                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-75 hover:opacity-100 transition-opacity"
-                            aria-label="Remove image"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors w-fit"
                           >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
+                            <span>⚔️</span>
+                            <span>Get Strategy Advice</span>
                           </button>
-                        </div>
+                        </>
                       )}
                     </div>
                   </div>

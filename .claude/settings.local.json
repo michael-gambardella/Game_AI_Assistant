@@ -8,7 +8,10 @@
       "Bash(ls -la \"/c/Users/mgamb/game-wingman-splash-frontend\" 2>&1 | head -50)",
       "Read(//c/Users/mgamb/game-wingman-splash-frontend/**)",
       "Bash(echo \"EXIT CODE: $?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx next *)",
+      "Bash(timeout 45 npx next build --no-lint)"
     ]
   }
 }

@@ -1977,19 +1977,35 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
 
         // Create enhanced system message for image-based questions
         let systemMessage: string | undefined;
-        const isLevelQuestion = questionToProcess.toLowerCase().includes('level') ||
+
+        // Strategy Advisor: tactical analysis of the CURRENT screenshot (what's dangerous,
+        // what's the opportunity, what to do next) - distinct from, and mutually exclusive
+        // with, the identification-focused checks below (analysis goal is different).
+        const isStrategyAdviceQuestion = (imageUrl || imageFilePath) &&
+          /(strateg|tactic|dangerous|opportunit|what should i do|advice)/i.test(questionToProcess);
+
+        const isLevelQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('level') ||
           questionToProcess.toLowerCase().includes('stage') ||
           questionToProcess.toLowerCase().includes('area') ||
-          questionToProcess.toLowerCase().includes('chapter');
-        const isItemQuestion = questionToProcess.toLowerCase().includes('item') ||
+          questionToProcess.toLowerCase().includes('chapter'));
+        const isItemQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('item') ||
           questionToProcess.toLowerCase().includes('weapon') ||
-          questionToProcess.toLowerCase().includes('equipment');
-        const isGameQuestion = questionToProcess.toLowerCase().includes('what game') ||
+          questionToProcess.toLowerCase().includes('equipment'));
+        const isGameQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('what game') ||
           questionToProcess.toLowerCase().includes('which game') ||
           questionToProcess.toLowerCase().includes('character') ||
-          questionToProcess.toLowerCase().includes('what is this from');
+          questionToProcess.toLowerCase().includes('what is this from'));
 
-        if (isLevelQuestion || isItemQuestion || isGameQuestion) {
+        if (isStrategyAdviceQuestion) {
+          systemMessage = `You are an expert video game strategy advisor analyzing a screenshot of the player's CURRENT in-game situation. When analyzing the image:
+
+CRITICAL INSTRUCTIONS:
+1. Analyze the SPECIFIC visual state shown (health/resource bars, enemy positions and types, terrain, items/loot visible, UI indicators, cooldowns, minimap, anything else on screen)
+2. Be precise and base your advice on the actual visual content shown, not generic tips - reference the specific things you can see
+3. Structure your answer around three things: the immediate danger/threat (if any), the opportunity (if any), and the single most useful next action
+4. If the screenshot doesn't show enough to give specific advice (e.g. a menu, cutscene, or unclear state), say so plainly rather than inventing details
+5. Do not identify the game/level/item unless it's necessary context for the advice - focus on what to DO, not what things are called`;
+        } else if (isLevelQuestion || isItemQuestion || isGameQuestion) {
           systemMessage = `You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. When analyzing images:
 
 CRITICAL INSTRUCTIONS:
@@ -2013,8 +2029,10 @@ CRITICAL INSTRUCTIONS:
         // Quest Companion: when we already know what game the user is playing and this
         // isn't an explicit request for a full guide, answer briefly (mid-session glance,
         // not a walkthrough to read) instead of the default long-form ## Heading format.
+        // Strategy Advisor answers are always short - a screenshot check-in, not a guide -
+        // regardless of whether we know the current game.
         const isGuideRequest = /\b(guide|walkthrough|full strategy|step[- ]by[- ]step|complete guide)\b/i.test(questionToProcess);
-        const isQuickCompanionMode = !!currentGamePrimary && !isGuideRequest;
+        const isQuickCompanionMode = isStrategyAdviceQuestion || (!!currentGamePrimary && !isGuideRequest);
         if (isQuickCompanionMode) {
           const quickInstruction = `Answer conversationally in 2-4 short sentences, like you're quickly telling a friend who's mid-game and needs a fast answer. Do NOT use ## headings or bullet lists for this kind of quick question.`;
           systemMessage = systemMessage ? `${systemMessage}\n\n${quickInstruction}` : quickInstruction;
