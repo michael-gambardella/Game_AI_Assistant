@@ -25,7 +25,8 @@ function detectQuestionCategory(question: string): string | undefined {
   }
 
   // Strategy patterns (check before general "how to" to catch strategy questions)
-  if (/(strategy|tactic|best build|loadout|optimal|build guide|meta|best way to|how should i)/i.test(lowerQuestion)) {
+  // "strateg" (not "strategy") catches both "strategy" and "strategic"
+  if (/(strateg|tactic|dangerous|opportunit|what should i do|advice|best build|loadout|optimal|build guide|meta|best way to|how should i)/i.test(lowerQuestion)) {
     return 'strategy';
   }
 
@@ -208,7 +209,8 @@ function detectInteractionType(question: string): string | undefined {
  */
 export const extractQuestionMetadata = async (
   question: string,
-  checkQuestionTypeFn?: (question: string) => string[]
+  checkQuestionTypeFn?: (question: string) => string[],
+  response?: string
 ): Promise<QuestionMetadata> => {
   try {
     console.log('[Metadata Extraction] Starting metadata extraction for question:', question.substring(0, 100));
@@ -235,9 +237,13 @@ export const extractQuestionMetadata = async (
       }
     }
 
-    // Detect question category
+    // Detect question category. Also scans the AI's response when provided - this matters
+    // for screenshot-driven questions (e.g. Strategy Advisor) where the question text itself
+    // is generic ("what should I do next?") but the response names what's actually on screen
+    // (e.g. "you're facing a boss..."), which the question text alone would never reveal.
     console.log('[Metadata Extraction] Calling detectQuestionCategory...');
-    const category = detectQuestionCategory(question);
+    const categoryText = response ? `${question} ${response}` : question;
+    const category = detectQuestionCategory(categoryText);
     console.log('[Metadata Extraction] detectQuestionCategory returned:', category);
     if (category) {
       metadata.questionCategory = category;

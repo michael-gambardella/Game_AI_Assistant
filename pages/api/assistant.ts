@@ -2004,7 +2004,7 @@ CRITICAL INSTRUCTIONS:
 2. Be precise and base your advice on the actual visual content shown, not generic tips - reference the specific things you can see
 3. Structure your answer around three things: the immediate danger/threat (if any), the opportunity (if any), and the single most useful next action
 4. If the screenshot doesn't show enough to give specific advice (e.g. a menu, cutscene, or unclear state), say so plainly rather than inventing details
-5. Do not identify the game/level/item unless it's necessary context for the advice - focus on what to DO, not what things are called`;
+5. Don't spend time on lengthy identification (game/level/item names) unless it's necessary context for the advice - focus on what to DO. That said, if the threat is a boss, superboss, or other clearly notable/named encounter, it's fine to briefly call it that (e.g. "this boss...") rather than avoiding the word entirely.`;
         } else if (isLevelQuestion || isItemQuestion || isGameQuestion) {
           systemMessage = `You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. When analyzing images:
 
@@ -2365,7 +2365,7 @@ CRITICAL INSTRUCTIONS:
         try {
           // console.log('[Background Metadata] Starting background metadata extraction...');
           // Extract metadata using the existing checkQuestionType function
-          const metadata = await extractQuestionMetadata(question, checkQuestionType);
+          const metadata = await extractQuestionMetadata(question, checkQuestionType, answer || undefined);
 
           // Update the question document with metadata
           await updateQuestionMetadata(questionId, metadata);
