@@ -33,6 +33,9 @@ import { getSourceName } from "../utils/linkShortener";
 const STRATEGY_ADVISOR_PROMPT =
   "Analyze this screenshot and give me strategic advice — what's dangerous, what's the opportunity, and what should I do next?";
 
+const HYPE_REACTION_PROMPT =
+  "React to this screenshot — hype up the win, commiserate the loss, whatever fits the moment.";
+
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState("");
@@ -2640,28 +2643,52 @@ export default function Home() {
                               </svg>
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setQuestion(STRATEGY_ADVISOR_PROMPT);
-                              setTimeout(() => {
-                                const input = document.querySelector(
-                                  'input[type="text"]'
-                                ) as HTMLInputElement;
-                                if (input) {
-                                  input.focus();
-                                  input.scrollIntoView({
-                                    behavior: "smooth",
-                                    block: "center",
-                                  });
-                                }
-                              }, 100);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors w-fit"
-                          >
-                            <span>⚔️</span>
-                            <span>Get Strategy Advice</span>
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuestion(STRATEGY_ADVISOR_PROMPT);
+                                setTimeout(() => {
+                                  const input = document.querySelector(
+                                    'input[type="text"]'
+                                  ) as HTMLInputElement;
+                                  if (input) {
+                                    input.focus();
+                                    input.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "center",
+                                    });
+                                  }
+                                }, 100);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors w-fit"
+                            >
+                              <span>⚔️</span>
+                              <span>Get Strategy Advice</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuestion(HYPE_REACTION_PROMPT);
+                                setTimeout(() => {
+                                  const input = document.querySelector(
+                                    'input[type="text"]'
+                                  ) as HTMLInputElement;
+                                  if (input) {
+                                    input.focus();
+                                    input.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "center",
+                                    });
+                                  }
+                                }, 100);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-600 hover:bg-amber-700 text-white rounded transition-colors w-fit"
+                            >
+                              <span>🔥</span>
+                              <span>Hype Me Up</span>
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>

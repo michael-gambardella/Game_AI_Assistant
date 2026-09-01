@@ -1984,14 +1984,20 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         const isStrategyAdviceQuestion = (imageUrl || imageFilePath) &&
           /(strateg|tactic|dangerous|opportunit|what should i do|advice)/i.test(questionToProcess);
 
-        const isLevelQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('level') ||
+        // Gaming Wingman: hype/commentary reaction to the CURRENT screenshot (celebrate a win,
+        // commiserate a loss, react to the moment) - distinct from, and mutually exclusive with,
+        // both Strategy Advisor (advice-focused) and the identification checks below.
+        const isHypeReactionQuestion = !isStrategyAdviceQuestion && (imageUrl || imageFilePath) &&
+          /(hype|react to this|hype me up|hype up|celebrate|roast me|commiserate)/i.test(questionToProcess);
+
+        const isLevelQuestion = !isStrategyAdviceQuestion && !isHypeReactionQuestion && (questionToProcess.toLowerCase().includes('level') ||
           questionToProcess.toLowerCase().includes('stage') ||
           questionToProcess.toLowerCase().includes('area') ||
           questionToProcess.toLowerCase().includes('chapter'));
-        const isItemQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('item') ||
+        const isItemQuestion = !isStrategyAdviceQuestion && !isHypeReactionQuestion && (questionToProcess.toLowerCase().includes('item') ||
           questionToProcess.toLowerCase().includes('weapon') ||
           questionToProcess.toLowerCase().includes('equipment'));
-        const isGameQuestion = !isStrategyAdviceQuestion && (questionToProcess.toLowerCase().includes('what game') ||
+        const isGameQuestion = !isStrategyAdviceQuestion && !isHypeReactionQuestion && (questionToProcess.toLowerCase().includes('what game') ||
           questionToProcess.toLowerCase().includes('which game') ||
           questionToProcess.toLowerCase().includes('character') ||
           questionToProcess.toLowerCase().includes('what is this from'));
@@ -2005,6 +2011,15 @@ CRITICAL INSTRUCTIONS:
 3. Structure your answer around three things: the immediate danger/threat (if any), the opportunity (if any), and the single most useful next action
 4. If the screenshot doesn't show enough to give specific advice (e.g. a menu, cutscene, or unclear state), say so plainly rather than inventing details
 5. Don't spend time on lengthy identification (game/level/item names) unless it's necessary context for the advice - focus on what to DO. That said, if the threat is a boss, superboss, or other clearly notable/named encounter, it's fine to briefly call it that (e.g. "this boss...") rather than avoiding the word entirely.`;
+        } else if (isHypeReactionQuestion) {
+          systemMessage = `You are an enthusiastic gaming hype-man reacting to a screenshot of what just happened in the player's game. When reacting:
+
+CRITICAL INSTRUCTIONS:
+1. Read the SPECIFIC visual state shown (victory/defeat screens, health/boss bars, kill feed, score, loot, rank-up, anything else on screen) and react to what's ACTUALLY there — never generic hype that could apply to any screenshot
+2. Match your tone to what's shown: go big on a clear win or big moment, commiserate or gently roast on a clear loss or close call, just vibe on anything neutral
+3. Keep it SHORT and punchy - like a reaction in stream chat or a friend hyping you up over your shoulder, not analysis
+4. If it's a boss, superboss, or other notable named encounter, it's fine to name it
+5. This is a reaction, not advice or identification - don't pivot into strategy tips or lengthy game/level identification unless a specific detail is needed to make the reaction land`;
         } else if (isLevelQuestion || isItemQuestion || isGameQuestion) {
           systemMessage = `You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. When analyzing images:
 
@@ -2029,15 +2044,16 @@ CRITICAL INSTRUCTIONS:
         // Quest Companion: when we already know what game the user is playing and this
         // isn't an explicit request for a full guide, answer briefly (mid-session glance,
         // not a walkthrough to read) instead of the default long-form ## Heading format.
-        // Strategy Advisor answers are always short - a screenshot check-in, not a guide -
-        // regardless of whether we know the current game.
+        // Strategy Advisor and Gaming Wingman hype reactions are always short - a screenshot
+        // check-in, not a guide - regardless of whether we know the current game.
         const isGuideRequest = /\b(guide|walkthrough|full strategy|step[- ]by[- ]step|complete guide)\b/i.test(questionToProcess);
-        const isQuickCompanionMode = isStrategyAdviceQuestion || (!!currentGamePrimary && !isGuideRequest);
+        const isQuickCompanionMode = isStrategyAdviceQuestion || isHypeReactionQuestion || (!!currentGamePrimary && !isGuideRequest);
         if (isQuickCompanionMode) {
           const quickInstruction = `Answer conversationally in 2-4 short sentences, like you're quickly telling a friend who's mid-game and needs a fast answer. Do NOT use ## headings or bullet lists for this kind of quick question.`;
           systemMessage = systemMessage ? `${systemMessage}\n\n${quickInstruction}` : quickInstruction;
         }
-        const answerMaxTokens = isQuickCompanionMode ? 300 : undefined;
+        // Hype reactions are a one-liner, not a mini-analysis - tighter cap than the general quick-mode budget.
+        const answerMaxTokens = isHypeReactionQuestion ? 120 : (isQuickCompanionMode ? 300 : undefined);
 
         let baseAnswer: string;
 
