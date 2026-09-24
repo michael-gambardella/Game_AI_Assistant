@@ -1,21 +1,27 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
+import { normalizeProgress } from '../../utils/gameContext';
+import { getSession } from '../../utils/session';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Identity comes from the auth cookie, never the request body - otherwise anyone could
+  // modify another user's lists.
+  const session = await getSession(req);
+  if (!session?.username) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
   try {
-    const { username, action, gameName, listType, notes } = req.body;
+    const { username } = session;
+    const { action, gameName, listType, notes } = req.body;
 
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
-    }
-
-    if (!action || !['add', 'remove', 'move'].includes(action)) {
-      return res.status(400).json({ message: 'Valid action is required (add, remove, move)' });
+    if (!action || !['add', 'remove', 'move', 'setProgress'].includes(action)) {
+      return res.status(400).json({ message: 'Valid action is required (add, remove, move, setProgress)' });
     }
 
     if (!gameName || typeof gameName !== 'string' || gameName.trim().length === 0) {
@@ -143,6 +149,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           notes: gameNotes || game.notes
         });
       }
+    } else if (action === 'setProgress') {
+      // Spoiler-safe mode: record how far the user is in a currently-playing game.
+      // An empty value clears it (turning spoiler-safe mode off for that game).
+      const { progress } = req.body;
+
+      if (progress !== undefined && progress !== null && typeof progress !== 'string') {
+        return res.status(400).json({ message: 'Progress must be a string' });
+      }
+
+      const game = user.gameTracking.currentlyPlaying.find(
+        (g: any) => g.gameName.toLowerCase() === trimmedGameName.toLowerCase()
+      );
+
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found in currently playing list' });
+      }
+
+      const normalizedProgress = normalizeProgress(progress);
+      game.progress = normalizedProgress || undefined;
     }
 
     await user.save();

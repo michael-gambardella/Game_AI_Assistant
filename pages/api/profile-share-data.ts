@@ -68,10 +68,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       };
     }
 
-    // Get game tracking data
-    const gameTracking = user.gameTracking || {
-      wishlist: [],
-      currentlyPlaying: []
+    // Get game tracking data. Progress notes are omitted: they're private context for
+    // spoiler-safe answers and could themselves spoil the game for whoever views the card.
+    const gameTracking = {
+      wishlist: user.gameTracking?.wishlist || [],
+      currentlyPlaying: (user.gameTracking?.currentlyPlaying || []).map((game: any) => ({
+        gameName: game.gameName,
+        startedAt: game.startedAt,
+        notes: game.notes,
+      })),
     };
 
     // Return profile data for sharing

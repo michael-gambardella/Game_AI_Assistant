@@ -49,6 +49,7 @@ export interface IUser extends Document {
       gameName: string;
       startedAt: Date;
       notes?: string;
+      progress?: string; // Where the user is in the game - AI avoids spoilers past this point
     }>;
   };
   guides?: Array<{
@@ -369,7 +370,8 @@ const UserSchema = new Schema<IUser>({
     currentlyPlaying: [{
       gameName: { type: String, required: true },
       startedAt: { type: Date, default: Date.now },
-      notes: { type: String } // Optional user notes about progress
+      notes: { type: String }, // Optional user notes about progress
+      progress: { type: String, maxlength: 150 } // Spoiler-safe mode: how far the user is (e.g. "Chapter 4", "just beat Margit")
     }]
   },
   // Saved guides - array of guides saved by the user

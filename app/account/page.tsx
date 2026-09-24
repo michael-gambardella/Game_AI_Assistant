@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { HealthMonitoring, AccountData } from "@/types";
-import axios from "axios";
+import axios from "../../utils/axiosConfig";
 import ProfileShareModal from "@/components/ProfileShareModal";
 import Avatar from "@/components/Avatar";
 import AvatarSelector from "@/components/AvatarSelector";
@@ -311,15 +311,9 @@ export default function AccountPage() {
 
         // Fetch game tracking
         try {
-          const gameTrackingResponse = await fetch("/api/game-tracking-get", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: userData.user.username }),
-          });
-          if (gameTrackingResponse.ok) {
-            const gameTrackingData = await gameTrackingResponse.json();
-            setGameTracking(gameTrackingData.gameTracking || null);
-          }
+          // Authenticated via cookie; shared axios instance refreshes an expired token
+          const { data: gameTrackingData } = await axios.post("/api/game-tracking-get");
+          setGameTracking(gameTrackingData.gameTracking || null);
         } catch (error) {
           console.error("Error fetching game tracking:", error);
         }
@@ -1403,22 +1397,12 @@ export default function AccountPage() {
               </p>
               {accountData && (
                 <GameTracker
-                  username={accountData.username}
                   gameTracking={gameTracking || undefined}
                   onUpdate={async () => {
                     // Refresh game tracking data
                     try {
-                      const response = await fetch("/api/game-tracking-get", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          username: accountData.username,
-                        }),
-                      });
-                      if (response.ok) {
-                        const data = await response.json();
-                        setGameTracking(data.gameTracking || null);
-                      }
+                      const { data } = await axios.post("/api/game-tracking-get");
+                      setGameTracking(data.gameTracking || null);
                     } catch (error) {
                       console.error("Error refreshing game tracking:", error);
                     }

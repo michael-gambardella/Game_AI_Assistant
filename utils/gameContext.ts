@@ -1,5 +1,22 @@
 import { fetchRecentlyPlayedGames } from './steamAPI';
 
+export const MAX_PROGRESS_LENGTH = 150;
+
+/**
+ * Normalizes a user-entered progress note ("Chapter 4", "just beat Margit") for storage
+ * and prompt injection: single line, no quotes/brackets (which would let it break out of
+ * the bracketed [Game Context: ...] block), capped length. Returns '' when empty.
+ */
+export function normalizeProgress(input: unknown): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/["\[\]{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_PROGRESS_LENGTH)
+    .trim();
+}
+
 export interface CurrentGameContext {
   contextString: string;
   primaryGame?: string;
@@ -16,12 +33,14 @@ export interface CurrentGameContext {
  * (mirrors the existing Steam-context handling in pages/api/assistant.ts).
  */
 export async function getCurrentGameContext(user: {
-  gameTracking?: { currentlyPlaying?: Array<{ gameName: string }> };
+  gameTracking?: { currentlyPlaying?: Array<{ gameName: string; progress?: string }> };
   steamId?: string;
 }): Promise<CurrentGameContext> {
-  const trackedGames = (user.gameTracking?.currentlyPlaying || [])
-    .map(g => g.gameName?.trim())
-    .filter((name): name is string => !!name);
+  const trackedEntries = (user.gameTracking?.currentlyPlaying || [])
+    .map(g => ({ name: g.gameName?.trim(), progress: normalizeProgress(g.progress) }))
+    .filter((g): g is { name: string; progress: string } => !!g.name);
+  const trackedGames = trackedEntries.map(g => g.name);
+  const hasProgress = trackedEntries.some(g => g.progress);
 
   let steamGames: string[] = [];
   if (user.steamId) {
@@ -53,8 +72,11 @@ export async function getCurrentGameContext(user: {
   );
 
   const parts: string[] = [];
-  if (trackedGames.length > 0) {
-    parts.push(`Currently playing: ${trackedGames.join(', ')}`);
+  if (trackedEntries.length > 0) {
+    const described = trackedEntries.map(g =>
+      g.progress ? `${g.name} (current progress: "${g.progress}")` : g.name
+    );
+    parts.push(`Currently playing: ${described.join(', ')}`);
   }
   if (uniqueSteamGames.length > 0) {
     parts.push(`Recently played on Steam: ${uniqueSteamGames.join(', ')}`);
@@ -62,7 +84,13 @@ export async function getCurrentGameContext(user: {
 
   const primaryGame = trackedGames[0] || steamGames[0]?.split(' (')[0];
 
-  const contextString = `[Game Context: This user is ${parts.join('. ')}. When the question doesn't name a specific game, assume it's about the game(s) listed above and answer accordingly. When suggesting games, prioritize titles in the same or closely related game types as the games listed above. Do NOT suggest generic "best games" lists — tailor suggestions specifically to the game types and styles of the user's current games.]`;
+  // Spoiler-safe mode: only added when the user has told us how far they are in at least one game,
+  // and scoped to those games so answers about other titles are unaffected.
+  const spoilerInstruction = hasProgress
+    ? ` SPOILER-SAFE MODE: For any game above with a stated current progress, treat everything beyond that point as a spoiler. Do NOT reveal later story events, plot twists, character deaths or identity reveals, endings, or the names of later bosses, areas, or unlocks. Answer using only what is relevant at or before their current progress. If a complete answer would require later-game information, briefly say so and tell them they can ask again with "spoilers OK" — unless this question already explicitly asks for spoilers, in which case answer fully.`
+    : '';
+
+  const contextString = `[Game Context: This user is ${parts.join('. ')}. When the question doesn't name a specific game, assume it's about the game(s) listed above and answer accordingly. When suggesting games, prioritize titles in the same or closely related game types as the games listed above. Do NOT suggest generic "best games" lists — tailor suggestions specifically to the game types and styles of the user's current games.${spoilerInstruction}]`;
 
   return { contextString, primaryGame };
 }

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import axios from "../utils/axiosConfig";
 import { GameTrackerProps, GameEntry } from "../types";
 
 const GameTracker: React.FC<GameTrackerProps> = ({
-  username,
   gameTracking,
   onUpdate,
 }) => {
@@ -26,6 +26,9 @@ const GameTracker: React.FC<GameTrackerProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Spoiler-safe progress editing (one currently-playing game at a time)
+  const [editingProgressFor, setEditingProgressFor] = useState<string | null>(null);
+  const [progressDraft, setProgressDraft] = useState("");
 
   useEffect(() => {
     if (gameTracking) {
@@ -36,18 +39,11 @@ const GameTracker: React.FC<GameTrackerProps> = ({
 
   const fetchGameTracking = async () => {
     try {
-      const response = await fetch("/api/game-tracking-get", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.gameTracking) {
-          setWishlist(data.gameTracking.wishlist || []);
-          setCurrentlyPlaying(data.gameTracking.currentlyPlaying || []);
-        }
+      // Shared axios instance: sends the auth cookie and refreshes an expired token on 401
+      const { data } = await axios.post("/api/game-tracking-get");
+      if (data.gameTracking) {
+        setWishlist(data.gameTracking.wishlist || []);
+        setCurrentlyPlaying(data.gameTracking.currentlyPlaying || []);
       }
     } catch (err) {
       console.error("Error fetching game tracking:", err);
@@ -76,23 +72,12 @@ const GameTracker: React.FC<GameTrackerProps> = ({
       if (selectedLists.wishlist) listTypes.push("wishlist");
       if (selectedLists.currentlyPlaying) listTypes.push("currentlyPlaying");
 
-      const response = await fetch("/api/game-tracking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          action: "add",
-          gameName: newGameName.trim(),
-          listType: listTypes,
-          notes: newGameNotes.trim() || undefined,
-        }),
+      const { data } = await axios.post("/api/game-tracking", {
+        action: "add",
+        gameName: newGameName.trim(),
+        listType: listTypes,
+        notes: newGameNotes.trim() || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to add game");
-      }
 
       // Update local state with all lists
       setWishlist(data.gameTracking.wishlist || []);
@@ -115,7 +100,7 @@ const GameTracker: React.FC<GameTrackerProps> = ({
       // Refresh data to ensure consistency
       await fetchGameTracking();
     } catch (err: any) {
-      setError(err.message || "Failed to add game");
+      setError(err.response?.data?.message || err.message || "Failed to add game");
     } finally {
       setLoading(false);
     }
@@ -127,22 +112,11 @@ const GameTracker: React.FC<GameTrackerProps> = ({
     setSuccess(null);
 
     try {
-      const response = await fetch("/api/game-tracking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          action: "remove",
-          gameName,
-          listType,
-        }),
+      const { data } = await axios.post("/api/game-tracking", {
+        action: "remove",
+        gameName,
+        listType,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to remove game");
-      }
 
       // Update local state
       if (listType === "wishlist") {
@@ -159,7 +133,7 @@ const GameTracker: React.FC<GameTrackerProps> = ({
 
       await fetchGameTracking();
     } catch (err: any) {
-      setError(err.message || "Failed to remove game");
+      setError(err.response?.data?.message || err.message || "Failed to remove game");
     } finally {
       setLoading(false);
     }
@@ -175,23 +149,12 @@ const GameTracker: React.FC<GameTrackerProps> = ({
     setSuccess(null);
 
     try {
-      const response = await fetch("/api/game-tracking", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          action: "move",
-          gameName,
-          fromList,
-          toList,
-        }),
+      const { data } = await axios.post("/api/game-tracking", {
+        action: "move",
+        gameName,
+        fromList,
+        toList,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to move game");
-      }
 
       // Update local state
       setWishlist(data.gameTracking.wishlist || []);
@@ -205,7 +168,51 @@ const GameTracker: React.FC<GameTrackerProps> = ({
 
       await fetchGameTracking();
     } catch (err: any) {
-      setError(err.message || "Failed to move game");
+      setError(err.response?.data?.message || err.message || "Failed to move game");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditingProgress = (game: GameEntry) => {
+    setEditingProgressFor(game.gameName);
+    setProgressDraft(game.progress || "");
+    setError(null);
+    setSuccess(null);
+  };
+
+  const cancelEditingProgress = () => {
+    setEditingProgressFor(null);
+    setProgressDraft("");
+  };
+
+  const handleSaveProgress = async (gameName: string, progress: string) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const { data } = await axios.post("/api/game-tracking", {
+        action: "setProgress",
+        gameName,
+        progress: progress.trim(),
+      });
+
+      setCurrentlyPlaying(data.gameTracking.currentlyPlaying || []);
+      cancelEditingProgress();
+      setSuccess(
+        progress.trim()
+          ? "Progress saved! Wingman will avoid spoilers past this point."
+          : "Progress cleared - spoiler-safe mode is off for this game."
+      );
+
+      if (onUpdate) {
+        onUpdate();
+      }
+
+      await fetchGameTracking();
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || "Failed to save progress");
     } finally {
       setLoading(false);
     }
@@ -326,6 +333,9 @@ const GameTracker: React.FC<GameTrackerProps> = ({
           <span>🎮</span>
           Currently Playing ({currentlyPlaying.length})
         </h3>
+        <p className="text-gray-400 text-xs mb-3">
+          🛡️ Set your progress on a game and Wingman will avoid spoilers past that point.
+        </p>
         {currentlyPlaying.length === 0 ? (
           <p className="text-gray-400 text-sm">No games in your currently playing list</p>
         ) : (
@@ -339,6 +349,67 @@ const GameTracker: React.FC<GameTrackerProps> = ({
                   <h4 className="text-white font-semibold truncate">{game.gameName}</h4>
                   {game.notes && (
                     <p className="text-gray-400 text-sm mt-1">{game.notes}</p>
+                  )}
+                  {editingProgressFor === game.gameName ? (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="text"
+                        value={progressDraft}
+                        onChange={(e) => setProgressDraft(e.target.value)}
+                        maxLength={150}
+                        autoFocus
+                        placeholder='e.g. "Chapter 4" or "just beat the first boss"'
+                        className="w-full px-3 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#00ffff] focus:border-transparent"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleSaveProgress(game.gameName, progressDraft);
+                          } else if (e.key === "Escape") {
+                            cancelEditingProgress();
+                          }
+                        }}
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSaveProgress(game.gameName, progressDraft)}
+                          disabled={loading}
+                          className="px-3 py-1 bg-[#00ffff]/80 hover:bg-[#00ffff] disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 text-xs font-semibold rounded transition-colors"
+                        >
+                          Save
+                        </button>
+                        {game.progress && (
+                          <button
+                            onClick={() => handleSaveProgress(game.gameName, "")}
+                            disabled={loading}
+                            className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+                          >
+                            Clear
+                          </button>
+                        )}
+                        <button
+                          onClick={cancelEditingProgress}
+                          disabled={loading}
+                          className="px-3 py-1 text-gray-400 hover:text-white text-xs transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      {game.progress ? (
+                        <p className="text-[#00ffff]/90 text-sm">
+                          🛡️ Progress: {game.progress}
+                        </p>
+                      ) : null}
+                      <button
+                        onClick={() => startEditingProgress(game)}
+                        disabled={loading}
+                        className="text-xs text-gray-400 hover:text-[#00ffff] underline disabled:cursor-not-allowed transition-colors"
+                        title="Wingman will avoid spoilers past this point"
+                      >
+                        {game.progress ? "Edit" : "Set progress (spoiler-safe)"}
+                      </button>
+                    </div>
                   )}
                   {game.startedAt && (
                     <p className="text-gray-500 text-xs mt-1">

@@ -1,19 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../utils/withDatabase';
 import User from '../../models/User';
+import { getSession } from '../../utils/session';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Identity comes from the auth cookie, never the request body - otherwise anyone could
+  // read another user's lists (including private spoiler-safe progress notes).
+  const session = await getSession(req);
+  if (!session?.username) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
   try {
-    const { username } = req.body;
-
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
-    }
-
+    const { username } = session;
 
     const user = await User.findOne({ username }).select('gameTracking');
 

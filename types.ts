@@ -1100,6 +1100,7 @@ export interface GameEntry {
   addedAt?: Date | string;
   startedAt?: Date | string;
   notes?: string;
+  progress?: string;
 }
 
 export interface GameTracking {
@@ -1124,7 +1125,6 @@ export interface MyGuidesProps {
 }
 
 export interface GameTrackerProps {
-  username: string;
   gameTracking?: GameTracking;
   onUpdate?: () => void;
 }
