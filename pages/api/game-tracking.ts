@@ -12,12 +12,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Identity comes from the auth cookie, never the request body - otherwise anyone could
   // modify another user's lists.
   const session = await getSession(req);
-  if (!session?.username) {
+  if (!session?.userId) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
   try {
-    const { username } = session;
     const { action, gameName, listType, notes } = req.body;
 
     if (!action || !['add', 'remove', 'move', 'setProgress'].includes(action)) {
@@ -29,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ userId: session.userId });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

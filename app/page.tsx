@@ -433,7 +433,11 @@ export default function Home() {
             });
 
             if (res.data && res.data.user) {
-              const userData = res.data.user;
+              // splash-login only echoes the email when we sent it; fall back to the link's email
+              const userData = {
+                ...res.data.user,
+                email: res.data.user.email || earlyAccessEmail || "",
+              };
               const newUsername = userData.username || earlyAccessUserId;
 
               // Store user data with logging for debugging
@@ -570,9 +574,8 @@ export default function Home() {
     }
 
     try {
-      const response = await axios.post("/api/accountData", {
-        username,
-      });
+      // Identified by auth cookie; username only gates whether a user is signed in
+      const response = await axios.post("/api/accountData");
 
       if (response.data?.user?.healthMonitoring) {
         // Use the actual setting from database, default to false if not set
@@ -1940,9 +1943,18 @@ export default function Home() {
       userId,
       username,
       password,
+      // Email from the approval link proves ownership for first-time setup (no session yet)
+      email: earlyAccessUserData?.email || localStorage.getItem("userEmail") || undefined,
     });
 
     if (res.data && res.data.user) {
+      // Setup also signs the user in (auth cookies) - reset refresh tracking like other logins
+      const { recordLogin, clearTokenRefreshRecord } = await import(
+        "../utils/tokenRefresh"
+      );
+      clearTokenRefreshRecord();
+      recordLogin();
+
       // Update local storage with updated user data
       localStorage.setItem("username", res.data.user.username);
       localStorage.setItem("userId", res.data.user.userId);

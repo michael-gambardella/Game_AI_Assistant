@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
+import axios from "../utils/axiosConfig";
 import { trackFeedbackSubmitted } from "../utils/analytics";
 import { FeedbackFormProps, FeedbackFormData } from "../types";
 
@@ -50,20 +51,14 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
 
     try {
       // Fetch user's email from account data
-      const accountResponse = await fetch("/api/accountData", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username }),
-      });
-
-      if (!accountResponse.ok) {
+      // Identified by auth cookie; shared axios instance refreshes an expired token
+      let userEmail: string;
+      try {
+        const { data: accountData } = await axios.post("/api/accountData");
+        userEmail = accountData.user.email;
+      } catch {
         throw new Error("Failed to fetch user email");
       }
-
-      const accountData = await accountResponse.json();
-      const userEmail = accountData.user.email;
 
       const response = await fetch("/api/feedback/submit", {
         method: "POST",

@@ -11,14 +11,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Identity comes from the auth cookie, never the request body - otherwise anyone could
   // read another user's lists (including private spoiler-safe progress notes).
   const session = await getSession(req);
-  if (!session?.username) {
+  if (!session?.userId) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
   try {
-    const { username } = session;
-
-    const user = await User.findOne({ username }).select('gameTracking');
+    const user = await User.findOne({ userId: session.userId }).select('gameTracking');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

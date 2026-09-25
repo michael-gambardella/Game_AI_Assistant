@@ -9,42 +9,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Identity comes from the auth cookie, never the request body - otherwise anyone could
+  // fetch another user's email, subscription and account details by guessing a username.
+  const session = await getSession(req);
+  if (!session?.userId) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
   try {
-    let { username } = req.body;
-
-    // If username not provided in body, try to get it from session
-    if (!username) {
-      try {
-        const session = await getSession(req);
-        if (session && session.username) {
-          username = session.username;
-        }
-      } catch (error) {
-        // Session check failed, will require username in body
-        console.error('Error getting session:', error);
-      }
-    }
-
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required. Please provide username in request body or sign in.' });
-    }
-
-
-    const user = await User.findOne({ username }).select('-__v');
+    // Look up by the token's stable userId, not its username - usernames can be changed
+    // after the token was issued.
+    const user = await User.findOne({ userId: session.userId }).select('-__v');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Count actual Question documents for accurate conversation count
-    const actualConversationCount = await Question.countDocuments({ username });
+    const actualConversationCount = await Question.countDocuments({ username: user.username });
 
     // Return user data without sensitive information
     const userData = {
       user: {
         username: user.username,
         email: user.email,
-        password: user.password, // Include password field for hasPassword check
+        hasPassword: !!user.password, // Boolean only - never send the hash to the client
         conversationCount: actualConversationCount, // Use actual count instead of user.conversationCount
         hasProAccess: user.hasProAccess,
         achievements: user.achievements || [],

@@ -6,6 +6,7 @@ import { sendWelcomeEmail } from '../../../utils/emailService';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { handleContentViolation } from '../../../utils/violationHandler';
 import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
+import { setAuthCookiesWithSession } from '../../../utils/session';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -167,6 +168,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Save user to database
     await newUser.save();
+
+    // Sign the new user in (HTTP-only auth cookies + session record), same as /api/auth/signin.
+    // The signup page promises automatic sign-in, and cookie-authenticated routes like
+    // /api/accountData require it.
+    await setAuthCookiesWithSession(req, res, newUser.userId, newUser.username, newUser.email);
 
     // Send welcome email (don't wait for it to complete)
     sendWelcomeEmail(email, username).catch(error => {

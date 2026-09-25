@@ -10,14 +10,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const { userId, email } = req.body;
 
-  if (!userId) {
+  // Strict types: a non-string userId would be treated as a MongoDB query operator
+  if (typeof userId !== 'string' || !userId || (email !== undefined && email !== null && typeof email !== 'string')) {
     return res.status(400).json({ message: 'User ID is required' });
   }
 
   try {
 
-    // Sync user data from splash page
-    await syncUserData(userId, email);
+    // Sync user data from splash page. Deliberately userId-only: syncUserData trusts its email
+    // argument (it overwrites the stored email, and can re-key an account found by that email),
+    // and this route is unauthenticated. New users are created from the splash record's own
+    // email; the caller's email is only checked against the stored one below.
+    await syncUserData(userId);
 
     // Refetch the user after sync to ensure we have the latest data (Pro access, password setup, etc.)
     const user = await User.findOne({ userId });
@@ -61,7 +65,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       user: {
         userId: user.userId,
         username: user.username,
-        email: user.email,
+        // Only echo the email back when the caller already supplied it (verified above) - a
+        // userId alone must not reveal it, since setup-early-access uses it as proof of the link.
+        email: email ? user.email : undefined,
         hasProAccess: user.hasProAccess,
         subscription: user.subscription,
         requiresPasswordSetup: needsPasswordSetup, // Flag if they need to set up password

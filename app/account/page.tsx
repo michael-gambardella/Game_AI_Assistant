@@ -217,30 +217,24 @@ export default function AccountPage() {
           }
         }
 
-        // If we don't have username, try calling API without it (API will get from session)
-        // Fetch user data
-        console.log("[Account Page] Fetching account data, username:", username || "none (will use session)");
-        const userResponse = await fetch("/api/accountData", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include", // Ensure cookies are sent
-          body: JSON.stringify(username ? { username } : {}), // Send empty object if no username
-        });
-        
-        console.log("[Account Page] Account data response status:", userResponse.status);
-
-        if (!userResponse.ok) {
+        // Fetch user data. The API identifies the user from the auth cookie only; the shared
+        // axios instance refreshes an expired access token and retries on 401.
+        let userData: any;
+        try {
+          ({ data: userData } = await axios.post("/api/accountData"));
+        } catch (err: any) {
+          if (err?.response?.status === 401) {
+            // No valid session (and refresh failed) - send them to sign in
+            window.location.assign("/signin");
+            return;
+          }
           throw new Error("Failed to fetch user data");
         }
 
-        const userData = await userResponse.json();
-
-        // Update username from API response if we didn't have it
-        if (!username && userData?.user?.username) {
+        // The session is the source of truth - override any stale localStorage username
+        if (userData?.user?.username && userData.user.username !== username) {
           username = userData.user.username;
-          if (username) {
-            localStorage.setItem("username", username);
-          }
+          localStorage.setItem("username", userData.user.username);
         }
 
         // Fetch subscription status (use username from response if available)
@@ -278,7 +272,7 @@ export default function AccountPage() {
           achievements: userData.user.achievements || [],
           challengeRewards: userData.user.challengeRewards || [],
           progress: userData.user.progress || { totalQuestions: 0 },
-          hasPassword: !!userData.user.password,
+          hasPassword: !!userData.user.hasPassword,
           healthMonitoring: userData.user.healthMonitoring,
           twitchUsername: userData.user.twitchUsername || null,
           twitchId: userData.user.twitchId || null,
