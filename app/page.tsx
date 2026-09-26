@@ -522,17 +522,19 @@ export default function Home() {
         // Normal user flow
         const storedUsername = localStorage.getItem("username");
         if (storedUsername) {
-          // Try to fetch user by username
+          // Confirm who is signed in. The API identifies the user from the auth cookie (the
+          // stored username is just a hint); a 401 triggers token refresh, and if that fails
+          // the sessionExpired handler clears local state and sends the user to sign in.
           try {
-            const res = await axios.get(
-              `/api/findUserByUsername?username=${storedUsername}`
-            );
+            const res = await axios.get("/api/findUserByUsername");
             if (res.data && res.data.user) {
-              // Existing user: sync userId/email from backend
+              // Existing user: sync identity from the session (overrides stale localStorage)
+              const sessionUsername = res.data.user.username || storedUsername;
+              localStorage.setItem("username", sessionUsername);
               localStorage.setItem("userId", res.data.user.userId);
-              localStorage.setItem("userEmail", res.data.user.email);
+              localStorage.setItem("userEmail", res.data.user.email || "");
               setUserId(res.data.user.userId);
-              setUsername(storedUsername);
+              setUsername(sessionUsername);
               setShowUsernameModal(false);
               setLoading(false);
               return;
@@ -691,17 +693,16 @@ export default function Home() {
           if (newUsername) {
             // Fetch new user data
             try {
-              const res = await axios.get(
-                `/api/findUserByUsername?username=${newUsername}`
-              );
+              // Identity comes from the auth cookie (shared across tabs), not the new value
+              const res = await axios.get("/api/findUserByUsername");
               if (res.data && res.data.user) {
                 // Update state with new user
                 localStorage.setItem("userId", res.data.user.userId);
-                localStorage.setItem("userEmail", res.data.user.email);
+                localStorage.setItem("userEmail", res.data.user.email || "");
 
                 // Update state and fetch conversations
                 setUserId(res.data.user.userId);
-                setUsername(newUsername);
+                setUsername(res.data.user.username || newUsername);
 
                 // Fetch new user's conversations and usage status
                 // Clear conversations first to show loading state
