@@ -223,22 +223,17 @@ export default function Home() {
           typeof window !== "undefined" ? window.location.search : ""
         );
         const token = urlParams.get("token");
-        const tokenUserId = urlParams.get("userId");
-        const tokenEmail = urlParams.get("email");
 
         // If token is present, exchange it for session cookies
         if (token) {
           try {
             console.log("Token detected in URL, exchanging for session...");
 
-            // Exchange token for session cookies
+            // Exchange token for session cookies (the signed, single-use token is the only
+            // proof of identity - userId/email URL params are not accepted)
             const exchangeRes = await axios.post(
               "/api/auth/exchange-token",
-              {
-                token,
-                userId: tokenUserId || undefined,
-                email: tokenEmail || undefined,
-              },
+              { token },
               {
                 withCredentials: true, // Ensure cookies are sent and received
               }
@@ -250,7 +245,7 @@ export default function Home() {
               exchangeRes.data.user
             ) {
               const userData = exchangeRes.data.user;
-              const newUsername = userData.username || tokenUserId || "";
+              const newUsername = userData.username || "";
 
               // Clear any existing session to prevent logging in wrong user
               const oldUsername = localStorage.getItem("username");
@@ -312,8 +307,15 @@ export default function Home() {
                 window.history.replaceState({}, "", window.location.pathname);
               }
 
-              // Proceed with normal flow
-              setShowUsernameModal(false);
+              // New early-access users finish setup (username/password) now that they're
+              // signed in - setup-early-access requires the session.
+              if (userData.requiresUsernameSetup || userData.requiresPasswordSetup) {
+                setEarlyAccessUserData(userData);
+                setShowEarlyAccessSetupModal(true);
+                setIsEarlyAccessUser(true);
+              } else {
+                setShowUsernameModal(false);
+              }
               fetchConversations();
               setLoading(false);
               return;
@@ -321,13 +323,13 @@ export default function Home() {
           } catch (err: any) {
             console.error("Error exchanging token:", err);
 
-            // If token exchange fails, show error and fall through to normal flow
+            // Expired, already-used or invalid link: explain and offer normal sign-in
             if (err.response?.status === 401 || err.response?.status === 403) {
-              const errorMessage =
+              setError(
                 err.response?.data?.message ||
-                "Authentication failed. Please try logging in again.";
-              console.error("Token exchange failed:", errorMessage);
-              // Don't show alert - let user proceed to normal login flow
+                  "This sign-in link is no longer valid. Please sign in, or request a new link."
+              );
+              setShowUsernameModal(true);
             }
 
             // Clean up URL parameters even on error
@@ -393,130 +395,20 @@ export default function Home() {
           return { userId, email, isEarlyAccess };
         };
 
-        const {
-          userId: earlyAccessUserId,
-          email: earlyAccessEmail,
-          isEarlyAccess,
-        } = parseEarlyAccessParams(
+        const { userId: earlyAccessUserId, isEarlyAccess } = parseEarlyAccessParams(
           typeof window !== "undefined" ? window.location.search : ""
         );
 
         if (isEarlyAccess && earlyAccessUserId) {
-          // Handle early access user
-          // Clear any existing session to prevent logging in wrong user
-          const oldUsername = localStorage.getItem("username");
-          const oldUserId = localStorage.getItem("userId");
-          localStorage.removeItem("username");
-          localStorage.removeItem("userId");
-          localStorage.removeItem("userEmail");
-
-          // Dispatch custom event to notify components in same tab
-          window.dispatchEvent(
-            new CustomEvent("localStorageChange", {
-              detail: {
-                key: "username",
-                oldValue: oldUsername,
-                newValue: null,
-              },
-            })
+          // Old-style links identified users by userId/email alone, which isn't proof of
+          // identity. Point them to normal sign-in or a fresh emailed link instead.
+          window.history.replaceState({}, "", window.location.pathname);
+          setError(
+            "This access link is no longer supported. Sign in with your password, or enter your email at videogamewingman.com to get a new sign-in link."
           );
-          window.dispatchEvent(
-            new CustomEvent("localStorageChange", {
-              detail: { key: "userId", oldValue: oldUserId, newValue: null },
-            })
-          );
-
-          try {
-            const res = await axios.post("/api/auth/splash-login", {
-              userId: earlyAccessUserId,
-              email: earlyAccessEmail,
-            });
-
-            if (res.data && res.data.user) {
-              // splash-login only echoes the email when we sent it; fall back to the link's email
-              const userData = {
-                ...res.data.user,
-                email: res.data.user.email || earlyAccessEmail || "",
-              };
-              const newUsername = userData.username || earlyAccessUserId;
-
-              // Store user data with logging for debugging
-              console.log("Splash login: Setting localStorage for user:", {
-                username: newUsername,
-                userId: userData.userId,
-                email: userData.email,
-              });
-
-              localStorage.setItem("username", newUsername);
-              localStorage.setItem("userId", userData.userId);
-              localStorage.setItem("userEmail", userData.email);
-
-              // Dispatch custom events to notify components in same tab
-              window.dispatchEvent(
-                new CustomEvent("localStorageChange", {
-                  detail: {
-                    key: "username",
-                    oldValue: oldUsername,
-                    newValue: newUsername,
-                  },
-                })
-              );
-              window.dispatchEvent(
-                new CustomEvent("localStorageChange", {
-                  detail: {
-                    key: "userId",
-                    oldValue: oldUserId,
-                    newValue: userData.userId,
-                  },
-                })
-              );
-
-              setUserId(userData.userId);
-              setUsername(newUsername);
-
-              // Check if user needs setup
-              if (
-                userData.requiresUsernameSetup ||
-                userData.requiresPasswordSetup
-              ) {
-                setEarlyAccessUserData(userData);
-                setShowEarlyAccessSetupModal(true);
-                setIsEarlyAccessUser(true);
-              } else {
-                // User is fully set up, proceed normally
-                setShowUsernameModal(false);
-                fetchConversations();
-              }
-
-              setLoading(false);
-              return;
-            }
-          } catch (err: any) {
-            console.error("Error authenticating early access user:", err);
-
-            // Show error message to user if it's an authentication failure
-            if (err.response?.status === 403) {
-              const errorMessage =
-                err.response?.data?.message ||
-                "Authentication failed. Please use the correct link for your account.";
-              alert(errorMessage);
-              // Show username modal for manual sign-in
-              setShowUsernameModal(true);
-            } else if (err.response?.status === 404) {
-              alert(
-                "User not found. Please contact support if you believe this is an error."
-              );
-              setShowUsernameModal(true);
-            } else {
-              // For other errors, fall through to normal flow
-              console.error(
-                "Unexpected error during early access authentication:",
-                err
-              );
-            }
-            setLoading(false);
-            return;
-          }
+          setShowUsernameModal(true);
+          setLoading(false);
+          return;
         }
 
         // Normal user flow
@@ -1940,12 +1832,11 @@ export default function Home() {
       throw new Error("User information not found");
     }
 
+    // Requires the session issued by the sign-in link (exchange-token)
     const res = await axios.post("/api/auth/setup-early-access", {
       userId,
       username,
       password,
-      // Email from the approval link proves ownership for first-time setup (no session yet)
-      email: earlyAccessUserData?.email || localStorage.getItem("userEmail") || undefined,
     });
 
     if (res.data && res.data.user) {

@@ -12,7 +12,7 @@ export interface ITokenBlacklist extends Document {
   tokenHash: string; // SHA-256 hash of the token (unique, indexed)
   userId: string; // User ID who owns the token (indexed)
   username: string; // Username (for easier queries)
-  tokenType: 'access' | 'refresh'; // Type of token
+  tokenType: 'access' | 'refresh' | 'cross-domain'; // Type of token ('cross-domain' = used splash sign-in link)
   blacklistedAt: Date; // When token was blacklisted
   expiresAt: Date; // Natural expiration time (for cleanup)
   reason?: string; // Optional reason: 'logout', 'security_incident', 'password_change', etc.
@@ -39,7 +39,7 @@ const TokenBlacklistSchema = new Schema<ITokenBlacklist>(
     tokenType: {
       type: String,
       required: true,
-      enum: ['access', 'refresh'],
+      enum: ['access', 'refresh', 'cross-domain'],
     },
     blacklistedAt: {
       type: Date,

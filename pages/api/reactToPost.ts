@@ -2,8 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
 
-// Valid reaction types
-const VALID_REACTIONS = ["🔥", "💡", "❓", "❤️"];
+import { VALID_REACTIONS } from "../../utils/forumReactions";
 
 async function handler(
   req: NextApiRequest,

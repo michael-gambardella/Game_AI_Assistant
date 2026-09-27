@@ -663,42 +663,32 @@ export default function AccountPage() {
     setUsernameResetSuccess("");
 
     try {
-      // Get current user info
-      const userId = localStorage.getItem("userId");
-      const email = localStorage.getItem("userEmail");
-
-      if (!userId || !email) {
-        setUsernameResetError(
-          "User information not found. Please sign in again."
-        );
-        return;
-      }
-
-      // Use the syncUser API to update username with content moderation
+      // Changes the signed-in user's username (identified by the auth cookie) with content
+      // moderation; the server re-issues the session with the new name
       const res = await axios.post("/api/syncUser", {
-        userId,
-        email,
         username: newUsername.trim(),
       });
 
       if (res.data && res.data.user) {
+        const updatedUsername = res.data.user.username;
+
         // Update local storage
-        localStorage.setItem("username", newUsername.trim());
+        localStorage.setItem("username", updatedUsername);
         localStorage.setItem("userId", res.data.user.userId);
-        localStorage.setItem("userEmail", res.data.user.email);
+        localStorage.setItem("userEmail", res.data.user.email || "");
 
         // Update account data
         setAccountData((prev) =>
           prev
             ? {
                 ...prev,
-                username: newUsername.trim(),
+                username: updatedUsername,
               }
             : null
         );
 
         setUsernameResetSuccess(
-          `Username updated successfully to: ${newUsername.trim()}`
+          `Username updated successfully to: ${updatedUsername}`
         );
 
         // Close modal and clear success message after 3 seconds

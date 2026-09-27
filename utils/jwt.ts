@@ -175,41 +175,42 @@ export const getTokenExpirationTime = (token: string): number | null => {
 };
 
 /**
- * Verify a cross-domain authentication token (from splash page)
- * Uses the same JWT_SECRET but may have different issuer/audience or be more lenient
+ * Verify a cross-domain authentication token (from splash page).
+ *
+ * Only genuine splash sign-in tokens are accepted: they're signed with the shared JWT_SECRET
+ * and carry type 'cross-domain-auth' / source 'splash-page'. Checking those claims matters -
+ * our own access tokens are signed with the same secret, and without it any access token
+ * (even one revoked at logout) could be exchanged for a fresh session.
  */
-export const verifyCrossDomainAuthToken = (token: string): TokenPayload & { isApproved?: boolean } => {
+export const verifyCrossDomainAuthToken = (
+  token: string
+): TokenPayload & { isApproved?: boolean; type: string; source: string; exp?: number } => {
   if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not configured');
   }
 
+  let decoded: any;
   try {
-    // First try with strict verification (same as access token)
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      issuer: 'videogamewingman',
-      audience: 'videogamewingman-users',
-    }) as TokenPayload & { isApproved?: boolean };
-
-    return decoded;
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    // If strict verification fails, try without issuer/audience checks
-    // (in case splash page uses different issuer/audience)
     if (error instanceof jwt.TokenExpiredError) {
       throw new Error('Token expired');
     } else if (error instanceof jwt.JsonWebTokenError) {
-      // Try without issuer/audience validation as fallback
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload & { isApproved?: boolean };
-        return decoded;
-      } catch (fallbackError) {
-        if (fallbackError instanceof jwt.TokenExpiredError) {
-          throw new Error('Token expired');
-        } else if (fallbackError instanceof jwt.JsonWebTokenError) {
-          throw new Error('Invalid token');
-        }
-        throw fallbackError;
-      }
+      throw new Error('Invalid token');
     }
     throw error;
   }
+
+  if (
+    !decoded ||
+    typeof decoded !== 'object' ||
+    decoded.type !== 'cross-domain-auth' ||
+    decoded.source !== 'splash-page' ||
+    typeof decoded.userId !== 'string' ||
+    typeof decoded.email !== 'string'
+  ) {
+    throw new Error('Invalid token');
+  }
+
+  return decoded;
 };

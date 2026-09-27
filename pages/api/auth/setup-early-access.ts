@@ -11,7 +11,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { userId, username, password, email } = req.body;
+  const { userId, username, password } = req.body;
 
   // Strict types: a non-string userId (e.g. {"$ne": null}) would be treated as a MongoDB
   // query operator and match an arbitrary user.
@@ -20,9 +20,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   if (password !== undefined && typeof password !== 'string') {
     return res.status(400).json({ message: 'Invalid password' });
-  }
-  if (email !== undefined && typeof email !== 'string') {
-    return res.status(400).json({ message: 'Invalid email' });
   }
 
   try {
@@ -38,28 +35,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(403).json({ message: 'User does not have early access' });
     }
 
-    // Authorization. Knowing a userId must never be enough to take over an account.
+    // Authorization: only the signed-in owner can set up their account. New early-access
+    // users get that session from their emailed single-use sign-in link (exchange-token).
+    // Knowing a userId (or email) must never be enough to take over an account.
     const session = await getSession(req);
-    const hasMatchingSession = session?.userId === user.userId;
+    if (session?.userId !== user.userId) {
+      return res.status(403).json({
+        message: user.password
+          ? 'This account is already set up. Please sign in.'
+          : 'Please use the sign-in link from your email to finish setting up your account.',
+      });
+    }
 
-    if (user.password) {
-      // Account is already set up: only its signed-in owner may change the username here,
-      // and passwords are changed via the account page (which verifies the current one).
-      if (!hasMatchingSession) {
-        return res.status(403).json({ message: 'This account is already set up. Please sign in.' });
-      }
-      if (password) {
-        return res.status(400).json({ message: 'Password is already set. Use Change Password in your account settings.' });
-      }
-    } else if (!hasMatchingSession) {
-      // First-time setup from the splash approval link (which may be clicked after its signed
-      // token has expired): require the account's email alongside the userId, matching the
-      // userId + email fallback accepted by /api/auth/exchange-token.
-      const providedEmail = (email || '').trim().toLowerCase();
-      const accountEmail = (user.email || '').trim().toLowerCase();
-      if (!providedEmail || !accountEmail || providedEmail !== accountEmail) {
-        return res.status(403).json({ message: 'Please use the access link from your approval email.' });
-      }
+    // Passwords on already-set-up accounts are changed via the account page (which verifies
+    // the current one), not here.
+    if (user.password && password) {
+      return res.status(400).json({ message: 'Password is already set. Use Change Password in your account settings.' });
     }
 
     // Validate username
@@ -113,8 +104,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     await user.save();
 
-    // Sign them in (HTTP-only cookies + session record) so cookie-authenticated routes work,
-    // and so the token carries the new username.
+    // Re-issue the session (HTTP-only cookies + session record) so the token carries the
+    // new username.
     await setAuthCookiesWithSession(req, res, user.userId, user.username, user.email);
 
     return res.status(200).json({

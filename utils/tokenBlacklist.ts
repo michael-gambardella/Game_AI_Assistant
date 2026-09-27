@@ -96,8 +96,45 @@ export async function blacklistToken(
 }
 
 /**
+ * Atomically mark a single-use token (e.g. a splash sign-in link) as used.
+ *
+ * Relies on the unique tokenHash index: of any number of concurrent claims for the same
+ * token, exactly one insert succeeds. Returns false if the token was already used.
+ * Unlike isTokenBlacklisted this fails closed - database errors are thrown, so a link can
+ * never be accepted without its use being recorded.
+ */
+export async function claimSingleUseToken(
+  token: string,
+  userId: string,
+  username: string,
+  expiresAt: Date
+): Promise<boolean> {
+  if (mongoose.connection.readyState !== 1) {
+    await connectToWingmanDB();
+  }
+
+  try {
+    await TokenBlacklist.create({
+      tokenHash: hashToken(token),
+      userId,
+      username,
+      tokenType: 'cross-domain',
+      blacklistedAt: new Date(),
+      expiresAt,
+      reason: 'single_use_consumed',
+    });
+    return true;
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      return false; // Duplicate key: already used
+    }
+    throw error;
+  }
+}
+
+/**
  * Check if a token is blacklisted
- * 
+ *
  * @param token - The JWT token to check
  * @returns Promise<boolean> - True if token is blacklisted
  */
