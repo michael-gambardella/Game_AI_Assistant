@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { validateAdminAccess } from '../../../../utils/adminAccess';
+import { getAuthenticatedUser } from '../../../../middleware/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -7,10 +8,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { username } = req.query;
-
-    // Validate admin access
-    const accessCheck = validateAdminAccess(username as string);
+    // Whether the *signed-in* user is the admin (a username in the request proves nothing).
+    // Not signed in -> simply not admin.
+    const user = await getAuthenticatedUser(req);
+    const accessCheck = validateAdminAccess(user?.username);
     
     if (accessCheck.hasAccess) {
       return res.status(200).json({

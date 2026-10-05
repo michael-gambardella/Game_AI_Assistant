@@ -2,20 +2,26 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../../utils/withDatabase';
 import Feedback from '../../../models/Feedback';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
-import { handleContentViolation, checkUserBanStatus } from '../../../utils/violationHandler';
+import { checkUserBanStatus } from '../../../utils/violationHandler';
 import { checkProAccess } from '../../../utils/proAccessUtil';
 import { validateFeedbackData } from '../../../utils/validation';
+import { requireUser } from '../../../middleware/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Submitter identity (and whose violation record a bad word lands on) comes from the
+  // session - a username/email in the body would let anyone submit as, or get banned, anyone
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const { username } = user;
+  const email = user.email || '';
+
   try {
     
     const { 
-      username, 
-      email, 
       category, 
       title, 
       message, 
@@ -24,9 +30,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } = req.body;
 
     // Validate required fields
-    if (!username || !email || !category || !title || !message) {
+    if (!email) {
+      return res.status(400).json({ error: 'Your account has no email address on file' });
+    }
+
+    if (!category || !title || !message) {
       return res.status(400).json({ 
-        error: 'Missing required fields: username, email, category, title, and message are required' 
+        error: 'Missing required fields: category, title, and message are required' 
       });
     }
 
@@ -57,28 +67,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Check for offensive content in title and message
-    const titleCheck = await containsOffensiveContent(title, username);
-    const messageCheck = await containsOffensiveContent(message, username);
+    // Check title and message together: containsOffensiveContent records the violation
+    // itself, so one check = one warning (separate checks plus handleContentViolation used
+    // to count a single submission up to three times - an instant ban)
+    const contentCheck = await containsOffensiveContent(`${title}
+${message}`, username);
 
-    if (titleCheck.isOffensive || messageCheck.isOffensive) {
-      const allOffendingWords = [
-        ...(titleCheck.offendingWords || []),
-        ...(messageCheck.offendingWords || [])
-      ];
-      
-      // Handle content violation using the existing violation system
-      const violationResult = await handleContentViolation(username, allOffendingWords, email);
+    if (contentCheck.isOffensive) {
+      const allOffendingWords = contentCheck.offendingWords || [];
+      const violationResult = contentCheck.violationResult;
       
       // Check if user is banned
-      if (violationResult.action === 'banned') {
+      if (violationResult?.action === 'banned') {
         return res.status(403).json({ 
-          error: `You are banned until ${violationResult.expiresAt}. Reason: Content violation.`,
+          error: `You are banned until ${violationResult?.expiresAt}. Reason: Content violation.`,
           violationResult
         });
       }
       
-      if (violationResult.action === 'permanent_ban') {
+      if (violationResult?.action === 'permanent_ban') {
         return res.status(403).json({ 
           error: 'You are permanently banned due to repeated content violations.',
           violationResult
@@ -87,10 +94,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       
       // If it's just a warning, still reject the feedback but show warning
       return res.status(400).json({ 
-        error: `The following words violate our policy: ${allOffendingWords.join(', ')}. This is warning ${violationResult.count} of 3.`,
+        error: `The following words violate our policy: ${allOffendingWords.join(', ')}. This is warning ${violationResult?.count} of 3.`,
         violationResult: {
-          title: titleCheck.violationResult,
-          message: messageCheck.violationResult,
           userViolation: violationResult
         }
       });
@@ -115,8 +120,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         tags: [],
         attachments,
         violationResult: {
-          title: titleCheck,
-          message: messageCheck,
+          title: { isOffensive: false, offendingWords: [] },
+          message: { isOffensive: false, offendingWords: [] },
           checkedAt: new Date(),
           isClean: true // This feedback passed moderation
         }

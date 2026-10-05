@@ -2,14 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { unlockAccount } from '../../../utils/accountLockout';
-import { requireAuth } from '../../../middleware/auth';
+import { requireAdminUser } from '../../../middleware/auth';
 
 /**
  * API endpoint for admins to unlock user accounts
  * POST /api/auth/admin-unlock-account
  * Body: { userId: string } or { username: string } or { email: string }
  * 
- * Note: This endpoint requires authentication. You may want to add admin role checking.
+ * Admin only (ADMIN_USERNAME, judged from the signed-in session).
  */
 async function handler(
   req: NextApiRequest,
@@ -21,12 +21,9 @@ async function handler(
 
   try {
     // Require authentication (admin should be logged in)
-    const authResult = await requireAuth(req, res);
-    if (!authResult.authenticated) {
-      return res.status(401).json({
-        message: 'Authentication required',
-      });
-    }
+    // Previously any signed-in user could unlock any account
+    const admin = await requireAdminUser(req, res);
+    if (!admin) return;
 
     const { userId, username, email } = req.body;
 
@@ -66,7 +63,7 @@ async function handler(
     // Log admin unlock
     console.log(
       `[SECURITY] Account unlocked by admin: userId=${user.userId}, ` +
-        `username=${user.username}, unlockedBy=${authResult.username}`
+        `username=${user.username}, unlockedBy=${admin.username}`
     );
 
     return res.status(200).json({

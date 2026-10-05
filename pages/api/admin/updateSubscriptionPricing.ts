@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import User from '../../../models/User';
 import { withWingmanDB } from '../../../utils/withDatabase';
-import { requireAdminAccess } from '../../../utils/adminAccess';
+import { requireAdminUser } from '../../../middleware/auth';
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripeClient = stripeSecret
@@ -23,20 +23,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const adminUsername =
-    (req.headers['x-username'] as string) ||
-    (typeof req.body?.username === 'string' ? req.body.username : undefined);
-
-  if (!adminUsername) {
-    return res.status(400).json({ message: 'Admin username is required' });
-  }
-
-  try {
-    requireAdminAccess(adminUsername);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unauthorized';
-    return res.status(403).json({ message });
-  }
+  // Admin identity comes from the session (signed-in browser, or Authorization: Bearer
+  // <access token> from a script) - never from a username/x-username in the request
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
 
   if (!stripeClient) {
     return res.status(500).json({ message: 'Stripe secret key is not configured' });

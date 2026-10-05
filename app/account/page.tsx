@@ -480,39 +480,19 @@ export default function AccountPage() {
     }
 
     try {
-      const userId = localStorage.getItem("userId");
-      const username = localStorage.getItem("username");
-
-      if (!userId || !username) {
-        setPasswordError("User information not found. Please sign in again.");
+      // Changing an existing password requires the current one
+      if (accountData?.hasPassword && !passwordData.currentPassword) {
+        setPasswordError("Current password is required to change password");
         return;
       }
 
-      // Check if user has existing password
-      if (accountData?.hasPassword) {
-        // User has password, require current password for change
-        if (!passwordData.currentPassword) {
-          setPasswordError("Current password is required to change password");
-          return;
-        }
-
-        // Verify current password first
-        const verifyResponse = await axios.post("/api/auth/signin", {
-          identifier: username,
-          password: passwordData.currentPassword,
-        });
-
-        if (!verifyResponse.data.user) {
-          setPasswordError("Current password is incorrect");
-          return;
-        }
-      }
-
-      // Set up or change password
+      // Set up or change password. Identified by the auth cookie; the server verifies the
+      // current password when one is already set.
       const response = await axios.post("/api/auth/setup-password", {
-        userId,
-        username,
         newPassword: passwordData.newPassword,
+        ...(accountData?.hasPassword
+          ? { currentPassword: passwordData.currentPassword }
+          : {}),
       });
 
       if (response.data) {

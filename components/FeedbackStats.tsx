@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { FeedbackStatsProps, StatsData } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const FeedbackStats: React.FC<FeedbackStatsProps> = ({ username }) => {
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -18,8 +19,8 @@ const FeedbackStats: React.FC<FeedbackStatsProps> = ({ username }) => {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/feedback/admin/stats?username=${encodeURIComponent(username)}`,
+      const response = await authFetch(
+        `/api/feedback/admin/stats`,
         {
           method: "GET",
           headers: {

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { authFetch } from "../../../utils/authFetch";
 import {
   trackForumPostCreated,
   trackForumView,
@@ -128,9 +129,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
         return;
       }
       try {
-        const res = await fetch(
-          `/api/feedback/admin/check?username=${encodeURIComponent(u)}`
-        );
+        // Admin status is judged from the session cookie, not the username
+        const res = await authFetch(`/api/feedback/admin/check`);
         const data = await res.json();
         setIsAdmin(data.isAdmin === true);
       } catch {

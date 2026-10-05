@@ -14,7 +14,22 @@ const ForgotPasswordPage: React.FC = () => {
   const [step, setStep] = useState<"email" | "verify">("email");
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [cooldownTime, setCooldownTime] = useState(0);
+  // Arrived from sign-in for an account without a password: the code was already emailed,
+  // so start on the code step - and ask for the email there (it's never revealed to us)
+  const [arrivedWithCode, setArrivedWithCode] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("codeSent") === "1") {
+      setArrivedWithCode(true);
+      setStep("verify");
+      setTimeRemaining(60);
+      setMessage(
+        "Your account needs a password. We've emailed a 6-digit verification code to the address on file - enter that email and the code below."
+      );
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   // Countdown timer effect
   useEffect(() => {
@@ -54,6 +69,14 @@ const ForgotPasswordPage: React.FC = () => {
 
   const validateCodeForm = () => {
     const newErrors: { [key: string]: string } = {};
+
+    if (arrivedWithCode) {
+      if (!email) {
+        newErrors.email = "Email is required";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        newErrors.email = "Please enter a valid email address";
+      }
+    }
 
     // Verification code validation
     if (!verificationCode) {
@@ -237,6 +260,32 @@ const ForgotPasswordPage: React.FC = () => {
           </form>
         ) : (
           <form onSubmit={handleCodeSubmit} className="space-y-4">
+            {/* Email (only when the code was sent from sign-in, so we never had it) */}
+            {arrivedWithCode && (
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500 ${
+                    errors.email ? "border-red-500" : "border-gray-300"
+                  }`}
+                  placeholder="Enter your account's email address"
+                  required
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
+            )}
+
             {/* Verification Code Field */}
             <div>
               <label
@@ -294,6 +343,7 @@ const ForgotPasswordPage: React.FC = () => {
             <button
               type="button"
               onClick={() => {
+                setArrivedWithCode(false);
                 setStep("email");
                 setVerificationCode("");
                 setTimeRemaining(0);

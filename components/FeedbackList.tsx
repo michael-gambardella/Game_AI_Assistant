@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 import { FeedbackListProps, Feedback } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const FeedbackList: React.FC<FeedbackListProps> = ({
   username,
@@ -53,7 +54,6 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
 
     try {
       const queryParams = new URLSearchParams({
-        username,
         page: currentPage.toString(),
         limit: itemsPerPage.toString(),
         sortBy,
@@ -77,7 +77,7 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
         queryParams.append("search", filters.search.trim());
       }
 
-      const response = await fetch(`/api/feedback/admin/all?${queryParams}`);
+      const response = await authFetch(`/api/feedback/admin/all?${queryParams}`);
       const result = await response.json();
 
       if (response.ok) {
@@ -216,13 +216,12 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
 
   const handleStatusUpdate = async (feedbackId: string, newStatus: string) => {
     try {
-      const response = await fetch("/api/feedback/admin/update-status", {
+      const response = await authFetch("/api/feedback/admin/update-status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
           feedbackId,
           status: newStatus,
         }),

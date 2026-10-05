@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { comparePassword } from '../../../utils/passwordUtils';
-import { setAuthCookies, setAuthCookiesWithSession } from '../../../utils/session';
+import { setAuthCookiesWithSession } from '../../../utils/session';
+import { sendPasswordResetCode } from '../../../utils/passwordReset';
 import {
   checkAccountLocked,
   trackFailedLoginAttempt,
@@ -55,10 +56,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const { identifier, password } = req.body; // identifier can be username or email
 
-  // Validate required fields
-  if (!identifier) {
+  // Validate required fields. Strict types: a non-string identifier (e.g. {"$ne": null})
+  // would be treated as a MongoDB query operator and match an arbitrary user.
+  if (typeof identifier !== 'string' || !identifier) {
     return res.status(400).json({ 
       message: 'Username or email is required' 
+    });
+  }
+  if (password !== undefined && typeof password !== 'string') {
+    return res.status(400).json({ 
+      message: 'Invalid password' 
     });
   }
 
@@ -102,22 +109,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Check if user has a password (new user) or not (legacy user)
+    // Accounts without a password (legacy / skipped setup) can't be signed into by name:
+    // knowing a username or email isn't proof of identity. Email the owner a reset code
+    // instead; they set a password via /forgot-password and then sign in normally.
+    // No session and no account data are returned here.
     if (!user.password) {
-      // Legacy user - no password required for now
-      // Return special flag to indicate password setup is needed
-      const { password: _, ...userResponse } = user.toObject();
-      
-      // Set authentication cookies even for legacy users
-      if (user.userId && user.username) {
-        await setAuthCookiesWithSession(req, res, user.userId, user.username, user.email);
-      }
-      
-      return res.status(200).json({
-        message: 'Signed in successfully',
-        user: userResponse,
-        requiresPasswordSetup: true,
-        isLegacyUser: true
+      const result = user.email ? await sendPasswordResetCode(user) : { status: 'failed' as const };
+
+      const message = !user.email
+        ? 'This account needs a password, but has no email on file. Please contact support.'
+        : result.status === 'throttled'
+          ? 'This account needs a password. We recently emailed a 6-digit code to the address on file - enter it on the next screen to set your password.'
+          : result.status === 'sent'
+            ? "This account needs a password. We've emailed a 6-digit code to the address on file - enter it on the next screen to set your password."
+            : "This account needs a password, but we couldn't send the code just now. Please use 'Forgot password' to try again.";
+
+      return res.status(403).json({
+        message,
+        requiresPasswordReset: true,
+        codeSent: result.status === 'sent' || result.status === 'throttled',
       });
     }
 

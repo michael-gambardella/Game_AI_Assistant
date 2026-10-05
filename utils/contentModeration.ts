@@ -535,6 +535,15 @@ const OFFENSIVE_WORDS = [
   // I do not approve any of these words, names, organizations and/or phrases being used in this application.
 ];
 
+/**
+ * Checks content for offensive words.
+ *
+ * NOTE: when offensive content is found this also RECORDS a violation (warning/ban) against
+ * `userId`, which is the username key of the violation record. Callers must pass the
+ * offender's current username (or a throwaway id, as the Discord/Twitch bots do) and must
+ * NOT call handleContentViolation again for the same content - use the returned
+ * violationResult instead, or the offense counts twice and bans come early.
+ */
 export const containsOffensiveContent = async (content: string, userId: string) => {
   // First do a quick local check using word boundaries to match whole words only
   const lowercaseContent = content.toLowerCase();

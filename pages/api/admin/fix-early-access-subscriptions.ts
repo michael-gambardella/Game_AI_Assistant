@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import { connectToSplashDB } from '../../../utils/databaseConnections';
 import User from '../../../models/User';
-import { requireAdminAccess } from '../../../utils/adminAccess';
+import { requireAdminUser } from '../../../middleware/auth';
 import { Schema } from 'mongoose';
 import { ISplashUser } from '../../../types';
 import { PRO_DEADLINE, EARLY_ACCESS_START_DATE, EARLY_ACCESS_END_DATE } from '../../../utils/earlyAccessConfig';
@@ -32,14 +32,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Admin identity comes from the session (signed-in browser, or Authorization: Bearer
+  // <access token> from a script) - never from a username/x-username in the request
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
+
   try {
-    // Get username from request (from query params for GET, body/headers for POST)
-    const username = req.method === 'GET' 
-      ? (req.query.username as string)
-      : (req.headers['x-username'] as string || req.body.username);
-    
-    // Require admin access
-    requireAdminAccess(username);
 
     // Connect to databases
     const splashDB = await connectToSplashDB();

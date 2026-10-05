@@ -2,8 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import mongoose from 'mongoose';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
-import { validateUserAuthentication } from '../../utils/validation';
 import { validateAdminAccess } from '../../utils/adminAccess';
+import { requireUser } from '../../middleware/auth';
 
 const ALLOWED_STATUSES = ['active', 'archived'] as const;
 
@@ -18,28 +18,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Creator/admin check uses the signed-in user - a username in the body or a
+  // "Bearer <username>" header proves nothing
+  const user = await requireUser(req, res);
+  if (!user) return;
+  const { username } = user;
+
   try {
-
-    // Use body.username for creator/admin check (client sends username; Bearer may be userId)
-    let username: string | null = null;
-    if (typeof req.body?.username === 'string' && req.body.username.trim()) {
-      username = req.body.username.trim();
-    }
-    if (!username) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        username = authHeader.split(' ')[1]?.trim() || null;
-      }
-    }
-    if (!username) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const userAuthErrors = validateUserAuthentication(username);
-    if (userAuthErrors.length > 0) {
-      return res.status(401).json({ error: userAuthErrors[0] });
-    }
-
     const { forumId, status } = req.body || {};
     if (!forumId || typeof forumId !== 'string') {
       return res.status(400).json({ error: 'forumId is required' });

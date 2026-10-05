@@ -28,6 +28,7 @@ import MyGuides from "../components/MyGuides";
 import { isLongGuide, extractGuideTitle } from "../utils/guideDetection";
 import { trackQuestionAsked } from "../utils/analytics";
 import { getSourceName } from "../utils/linkShortener";
+import { authFetch } from "../utils/authFetch";
 // import { useRouter } from "next/navigation";
 
 const STRATEGY_ADVISOR_PROMPT =
@@ -765,8 +766,9 @@ export default function Home() {
 
       try {
         // Lightweight admin check - uses dedicated endpoint that doesn't trigger errors
-        const adminCheckResponse = await fetch(
-          `/api/feedback/admin/check?username=${encodeURIComponent(username)}`,
+        // Admin status is judged from the session cookie, not the username
+        const adminCheckResponse = await authFetch(
+          `/api/feedback/admin/check`,
           {
             method: "GET",
             headers: { "Content-Type": "application/json" },
@@ -1775,6 +1777,15 @@ export default function Home() {
         }
       }
     } catch (err: any) {
+      // Passwordless account: a reset code was emailed - continue on the code screen
+      if (err.response?.status === 403 && err.response?.data?.requiresPasswordReset) {
+        if (err.response.data.codeSent) {
+          window.location.href = "/forgot-password?codeSent=1";
+        } else {
+          setUsernameError(err.response.data.message);
+        }
+        return;
+      }
       // Check if account is locked
       if (err.response?.status === 403 && err.response?.data?.accountLocked) {
         setAccountLocked(true);
@@ -1802,16 +1813,8 @@ export default function Home() {
   };
 
   const handlePasswordSetup = async (password: string) => {
-    const userId = localStorage.getItem("userId");
-    const username = localStorage.getItem("username");
-
-    if (!userId || !username) {
-      throw new Error("User information not found");
-    }
-
+    // Identified by the auth cookie
     const res = await axios.post("/api/auth/setup-password", {
-      userId,
-      username,
       newPassword: password,
     });
 

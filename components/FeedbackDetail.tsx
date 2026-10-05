@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { FeedbackDetailProps, Feedback } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   feedback,
@@ -90,13 +91,12 @@ const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     setIsUpdatingStatus(true);
 
     try {
-      const response = await fetch("/api/feedback/admin/update-status", {
+      const response = await authFetch("/api/feedback/admin/update-status", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
           feedbackId: feedback.feedbackId,
           status: newStatus,
         }),
@@ -126,13 +126,12 @@ const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     setIsSubmittingResponse(true);
 
     try {
-      const response = await fetch("/api/feedback/admin/respond", {
+      const response = await authFetch("/api/feedback/admin/respond", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
           feedbackId: feedback.feedbackId,
           adminResponse: adminResponse.trim(),
         }),

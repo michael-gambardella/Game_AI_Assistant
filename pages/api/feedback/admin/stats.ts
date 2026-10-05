@@ -1,21 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../../../utils/withDatabase';
 import Feedback from '../../../../models/Feedback';
-import { requireAdminAccess } from '../../../../utils/adminAccess';
+import { requireAdminUser } from '../../../../middleware/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Admin identity comes from the session, never from the request
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
+
   try {
     
-    const { username, timeframe = '30' } = req.query;
-    // console.log('Admin stats API called with username:', username); // Commented out for production
-
-    // Validate admin access
-    requireAdminAccess(username as string);
-    // console.log('Admin access validated successfully'); // Commented out for production
+    const { timeframe = '30' } = req.query;
 
     // Validate timeframe
     const timeframeDays = parseInt(timeframe as string);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import { Forum, ForumContextType, ForumFilters } from "../types";
 import { trackForumCreated } from "../utils/analytics";
 
@@ -575,18 +575,8 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         setLoading(true);
         const response = await axios.post(
           "/api/updateForumStatus",
-          {
-            forumId,
-            status,
-            username: localStorage.getItem("username"),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
-          }
+          // Identified by the auth cookie (creator or admin check is server-side)
+          { forumId, status }
         );
         const updatedForum = response.data.forum;
         if (updatedForum) {

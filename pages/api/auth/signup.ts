@@ -4,7 +4,6 @@ import User from '../../../models/User';
 import { hashPassword, validatePassword } from '../../../utils/passwordUtils';
 import { sendWelcomeEmail } from '../../../utils/emailService';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
-import { handleContentViolation } from '../../../utils/violationHandler';
 import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
 import { setAuthCookiesWithSession } from '../../../utils/session';
 
@@ -80,20 +79,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Check for offensive content in username
+    // No account exists yet, so the warning is recorded (once) against the signup email
     const contentCheck = await containsOffensiveContent(username, email);
     if (contentCheck.isOffensive) {
-      // Add a warning to the user's violation record
-      const violationResult = await handleContentViolation(username, contentCheck.offendingWords);
+      const violationResult = contentCheck.violationResult;
       
       // Create a more detailed error message
       let errorMessage = 'Username contains offensive content. Please try a different username.';
       
-      if (violationResult.action === 'warning') {
-        errorMessage = `Username contains inappropriate content: "${contentCheck.offendingWords.join(', ')}". Warning ${violationResult.count}/3. Please choose a different username.`;
-      } else if (violationResult.action === 'banned') {
-        const banDate = new Date(violationResult.expiresAt).toLocaleDateString();
+      if (violationResult?.action === 'warning') {
+        errorMessage = `Username contains inappropriate content: "${contentCheck.offendingWords.join(', ')}". Warning ${violationResult?.count}/3. Please choose a different username.`;
+      } else if (violationResult?.action === 'banned') {
+        const banDate = new Date(violationResult?.expiresAt).toLocaleDateString();
         errorMessage = `Username contains inappropriate content. You are temporarily banned until ${banDate}. Please try again later.`;
-      } else if (violationResult.action === 'permanent_ban') {
+      } else if (violationResult?.action === 'permanent_ban') {
         errorMessage = `Username contains inappropriate content. You are permanently banned from using this application.`;
       }
       

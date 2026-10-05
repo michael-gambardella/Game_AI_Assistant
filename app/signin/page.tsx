@@ -146,6 +146,15 @@ const SignInPage: React.FC = () => {
         }
       }
     } catch (err: any) {
+      // Passwordless account: a reset code was emailed - continue on the code screen
+      if (err.response?.status === 403 && err.response?.data?.requiresPasswordReset) {
+        if (err.response.data.codeSent) {
+          router.push("/forgot-password?codeSent=1");
+        } else {
+          setUsernameError(err.response.data.message);
+        }
+        return;
+      }
       // Check if account is locked
       if (err.response?.status === 403 && err.response?.data?.accountLocked) {
         setAccountLocked(true);
@@ -170,16 +179,8 @@ const SignInPage: React.FC = () => {
   };
 
   const handlePasswordSetup = async (password: string) => {
-    const currentUserId = localStorage.getItem("userId");
-    const currentUsername = localStorage.getItem("username");
-
-    if (!currentUserId || !currentUsername) {
-      throw new Error("User information not found");
-    }
-
+    // Identified by the auth cookie
     const res = await axios.post("/api/auth/setup-password", {
-      userId: currentUserId,
-      username: currentUsername,
       newPassword: password,
     });
 

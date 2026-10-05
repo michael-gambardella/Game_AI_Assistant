@@ -1,17 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Feedback from '../../../../models/Feedback';
-import { requireAdminAccess } from '../../../../utils/adminAccess';
+import { requireAdminUser } from '../../../../middleware/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const { username, feedbackId, status, priority } = req.body;
+  // Admin identity comes from the session, never from the request
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
 
-    // Validate admin access
-    requireAdminAccess(username);
+  try {
+    const { feedbackId, status, priority } = req.body;
 
     // Validate required fields
     if (!feedbackId) {

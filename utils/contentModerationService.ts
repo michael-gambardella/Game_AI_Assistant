@@ -1,12 +1,11 @@
-import axios from 'axios';
+import axios from './axiosConfig';
 import { ContentCheckResult } from '../types';
 
 export const checkContent = async (content: string, userId: string): Promise<ContentCheckResult> => {
   try {
-    const response = await axios.post('/api/checkContent', {
-      content,
-      username: userId  // API expects 'username' parameter, not 'userId'
-    });
+    // The server records any violation against the signed-in user (auth cookie), not a
+    // client-supplied name; the shared axios instance refreshes an expired token
+    const response = await axios.post('/api/checkContent', { content });
 
     return {
       isValid: true,

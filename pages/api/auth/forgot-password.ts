@@ -1,8 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
-import { generateVerificationCode, checkPasswordResetRateLimit } from '../../../utils/passwordUtils';
-import { sendPasswordResetVerificationCode } from '../../../utils/emailService';
+import { sendPasswordResetCode } from '../../../utils/passwordReset';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,8 +20,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  // Validate email format
-  if (!EMAIL_REGEX.test(email)) {
+  // Validate email format (string check also blocks MongoDB operator objects)
+  if (typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
     return res.status(400).json({ 
       message: 'Please enter a valid email address' 
     });
@@ -37,37 +36,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Always return success message for security (don't reveal if email exists)
     // But only process if user actually exists
     if (user) {
-      // Check rate limiting
-      const rateLimitCheck = checkPasswordResetRateLimit(user.lastPasswordResetRequest, 60);
-      
-      if (!rateLimitCheck.canRequest) {
+      const result = await sendPasswordResetCode(user);
+
+      if (result.status === 'throttled') {
         return res.status(429).json({
-          message: `Please wait ${rateLimitCheck.timeRemaining} seconds before requesting another password reset.`,
-          timeRemaining: rateLimitCheck.timeRemaining
+          message: `Please wait ${result.timeRemaining} seconds before requesting another password reset.`,
+          timeRemaining: result.timeRemaining
         });
       }
-
-      // Generate verification code
-      const verificationCode = generateVerificationCode();
-      const codeExpires = new Date(Date.now() + 60 * 1000); // 60 seconds from now
-
-      // Update user with verification code and rate limiting
-      await User.findOneAndUpdate(
-        { email },
-        {
-          passwordResetCode: verificationCode,
-          passwordResetCodeExpires: codeExpires,
-          lastPasswordResetRequest: new Date()
-        }
-      );
-
-      // Send verification code email
-      const emailSent = await sendPasswordResetVerificationCode(email, verificationCode, user.username);
-      
-      if (!emailSent) {
-        console.error(`Failed to send password reset verification code to ${email}`);
-        // Still return success to user for security
-      }
+      // On 'failed', still return success to the user for security (logged in the helper)
     }
 
     // Always return success message (security best practice)

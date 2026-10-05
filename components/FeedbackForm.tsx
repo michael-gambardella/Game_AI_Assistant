@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
-import axios from "../utils/axiosConfig";
+import { authFetch } from "../utils/authFetch";
 import { trackFeedbackSubmitted } from "../utils/analytics";
 import { FeedbackFormProps, FeedbackFormData } from "../types";
 
@@ -50,25 +50,13 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Fetch user's email from account data
-      // Identified by auth cookie; shared axios instance refreshes an expired token
-      let userEmail: string;
-      try {
-        const { data: accountData } = await axios.post("/api/accountData");
-        userEmail = accountData.user.email;
-      } catch {
-        throw new Error("Failed to fetch user email");
-      }
-
-      const response = await fetch("/api/feedback/submit", {
+      // Submitter (username + email) is taken from the auth cookie server-side
+      const response = await authFetch("/api/feedback/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
-          email: userEmail,
-          userType,
           category: formData.category,
           title: formData.title.trim(),
           message: formData.message.trim(),

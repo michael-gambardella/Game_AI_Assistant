@@ -1,19 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../../../utils/withDatabase';
 import Feedback from '../../../../models/Feedback';
-import { requireAdminAccess, getAdminUsernameForLogging } from '../../../../utils/adminAccess';
+import { requireAdminUser } from '../../../../middleware/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Admin identity comes from the session, never from the request
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
+
   try {
     
-    const { username, page = 1, limit = 20, status, category, priority, userType, search } = req.query;
+    const { page = 1, limit = 20, status, category, priority, userType, search } = req.query;
     
     // Log only the meaningful parameters (not undefined ones)
-    const logParams: any = { username, page, limit };
+    const logParams: any = { username: admin.username, page, limit };
     if (status && status !== 'undefined') logParams.status = status;
     if (category && category !== 'undefined') logParams.category = category;
     if (priority && priority !== 'undefined') logParams.priority = priority;
@@ -21,10 +25,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (search && search !== 'undefined') logParams.search = search;
     
     // console.log('Admin all feedback API called with:', logParams); // Commented out for production
-
-    // Validate admin access (checks against ADMIN_USERNAME environment variable)
-    requireAdminAccess(username as string);
-    // console.log('Admin access validated for all feedback API'); // Commented out for production
 
     // Validate pagination parameters
     const pageNum = parseInt(page as string);
