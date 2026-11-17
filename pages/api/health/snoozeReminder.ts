@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../../middleware/auth';
 import { withDatabase } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 import { SnoozeReminderResponse } from '../../../types';
@@ -15,7 +16,10 @@ async function handler(
   }
 
   try {
-    const { username } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
 
     if (!username) {
       return res.status(400).json({ 

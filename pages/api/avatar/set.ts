@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../../middleware/auth';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 
@@ -8,7 +9,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { username, avatarUrl } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
+    const { avatarUrl } = req.body;
 
     if (!username) {
       return res.status(400).json({ error: 'Username is required' });

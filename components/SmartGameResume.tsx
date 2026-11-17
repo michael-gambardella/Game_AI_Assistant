@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import { SmartGameResumeProps, GameResumeData } from "../types";
 
 export default function SmartGameResume({
@@ -33,7 +33,7 @@ export default function SmartGameResume({
 
       try {
         const response = await axios.get<GameResumeData>("/api/game-resume", {
-          params: { username },
+          params: {},
         });
 
         if (response.data && response.data.game && response.data.suggestion) {

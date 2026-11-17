@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 
@@ -14,7 +15,11 @@ async function handler(
   }
 
   try {
-    const { username, weeklyDigestEnabled } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
+    const { weeklyDigestEnabled } = req.body;
 
     if (!username) {
       return res.status(400).json({ 

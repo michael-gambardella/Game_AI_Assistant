@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { MyFeedbackListProps, Feedback } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const MyFeedbackList: React.FC<MyFeedbackListProps> = ({ username }) => {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
@@ -16,8 +17,8 @@ const MyFeedbackList: React.FC<MyFeedbackListProps> = ({ username }) => {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/feedback/my-feedback?username=${encodeURIComponent(username)}`
+      const response = await authFetch(
+        `/api/feedback/my-feedback`
       );
       const result = await response.json();
 

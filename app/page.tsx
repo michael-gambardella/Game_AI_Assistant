@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import axios from "../utils/axiosConfig";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
@@ -103,7 +103,7 @@ export default function Home() {
     useState<boolean>(false);
 
   // Achievement polling system - replaces Socket.IO for notifications
-  const { isPolling, lastChecked } = useAchievementPolling({
+  const { isPolling } = useAchievementPolling({
     username: username,
     isEnabled: !!username, // Only poll when user is logged in
     pollingInterval: 30000, // Check every 30 seconds
@@ -117,6 +117,7 @@ export default function Home() {
     recordBreak,
     endBreak,
     snoozeReminder,
+    endSession: endHealthSession,
   } = useHealthMonitoring({
     username: username,
     isEnabled: !!username && breakReminderEnabled, // Only monitor when user is logged in AND break reminders are enabled
@@ -141,7 +142,7 @@ export default function Home() {
     const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : "";
 
     const res = await axios.get(
-      `/api/getConversation?username=${storedUsername}&page=1&pageSize=20${cacheBuster}`
+      `/api/getConversation?page=1&pageSize=20${cacheBuster}`
     );
 
     // Merge fetched conversations with existing ones to preserve optimistic updates
@@ -869,7 +870,6 @@ export default function Home() {
     setRecommendations(null);
     setRecommendationsLoading(false);
     setRecommendationsMessage(null);
-    const startTime = performance.now();
 
     try {
       // console.log("Submitting question:", {
@@ -1005,10 +1005,6 @@ export default function Home() {
         throw error;
       }
 
-      //const endTime = performance.now();
-      // console.log(
-      //   `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
-      // ); // Commented out for production
       // console.log("Response:", res.data); // Commented out for production
 
       setResponse(res.data.answer);
@@ -1157,14 +1153,11 @@ export default function Home() {
   // delete conversation from database
   const handleDeleteConversation = async (id: string) => {
     try {
-      const storedUsername = localStorage.getItem("username");
       // Optimistically remove from UI immediately
       setConversations((prev) => prev.filter((conv) => conv._id !== id));
 
-      await axios.post("/api/deleteInteraction", {
-        id,
-        username: storedUsername,
-      });
+      // Server only deletes it if it belongs to the signed-in user (auth cookie)
+      await axios.post("/api/deleteInteraction", { id });
 
       // Refresh conversations to ensure sync with database
       fetchConversations();
@@ -1871,6 +1864,14 @@ export default function Home() {
     const oldUsername = localStorage.getItem("username");
     const oldUserId = localStorage.getItem("userId");
 
+    // End the gaming session first (records its play time and clears the server-side session
+    // so it isn't "resumed" later). Must run before logout - it needs the auth cookie. Capped
+    // at 3s so a slow request can't hold up signing out; endSession handles its own errors.
+    await Promise.race([
+      endHealthSession(),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+
     try {
       // Call logout API to blacklist tokens with timeout
       // This ensures tokens are invalidated on the server
@@ -1968,7 +1969,6 @@ export default function Home() {
       const guideTitle = extractGuideTitle(currentQuestion);
 
       const res = await axios.post("/api/guides/save", {
-        username,
         question: currentQuestion,
         response: currentResponse,
         title: guideTitle,

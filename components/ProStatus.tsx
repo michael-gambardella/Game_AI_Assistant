@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
 import AvatarSelector from "./AvatarSelector";
 import { ProStatusProps, SubscriptionStatus } from "@/types";
+import { authFetch } from "../utils/authFetch";
 
 const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   const router = useRouter();
@@ -33,10 +34,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         }
 
         // Fetch avatar
-        const avatarResponse = await fetch("/api/avatar/recent", {
+        const avatarResponse = await authFetch("/api/avatar/recent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({}),
         });
         if (avatarResponse.ok) {
           const avatarData = await avatarResponse.json();

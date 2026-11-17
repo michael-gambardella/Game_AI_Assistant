@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import Image from "next/image";
 import { SavedGuide, MyGuidesProps } from "../types";
 
@@ -18,7 +18,7 @@ export default function MyGuides({ username, isOpen, onClose }: MyGuidesProps) {
     setError(null);
 
     try {
-      const res = await axios.post("/api/guides/get", { username });
+      const res = await axios.post("/api/guides/get", {});
       if (res.data.success) {
         setGuides(res.data.guides || []);
       } else {

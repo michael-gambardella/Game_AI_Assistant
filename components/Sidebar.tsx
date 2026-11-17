@@ -5,6 +5,7 @@ import ProStatus from "./ProStatus";
 import DarkModeToggle from "./DarkModeToggle";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { authFetch } from "../utils/authFetch";
 
 // Precompile the keyword pattern once
 const keywords = [
@@ -187,10 +188,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
 
       // Also fetch conversation count directly to ensure Load More button shows correctly
       try {
-        const convResponse = await fetch(
-          `/api/getConversation?username=${encodeURIComponent(
-            storedUsername
-          )}&page=1&pageSize=20`
+        const convResponse = await authFetch(
+          `/api/getConversation?page=1&pageSize=20`
         );
         if (convResponse.ok) {
           const convData = await convResponse.json();
@@ -765,10 +764,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
                 setLoadingMore(true);
                 try {
                   const nextPage = currentPage + 1;
-                  const response = await fetch(
-                    `/api/getConversation?username=${encodeURIComponent(
-                      username
-                    )}&page=${nextPage}&pageSize=20`
+                  const response = await authFetch(
+                    `/api/getConversation?page=${nextPage}&pageSize=20`
                   );
                   if (response.ok) {
                     const data = await response.json();

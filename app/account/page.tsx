@@ -14,6 +14,7 @@ import TwitchModerationSettings from "@/components/TwitchModerationSettings";
 import TwitchBotAnalytics from "@/components/TwitchBotAnalytics";
 import ChallengeHistory from "@/components/ChallengeHistory";
 import { GameTracking } from "@/types";
+import { authFetch } from "../../utils/authFetch";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -290,10 +291,10 @@ export default function AccountPage() {
 
         // Fetch avatar
         try {
-          const avatarResponse = await fetch("/api/avatar/recent", {
+          const avatarResponse = await authFetch("/api/avatar/recent", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: userData.user.username }),
+            body: JSON.stringify({}),
           });
           if (avatarResponse.ok) {
             const avatarData = await avatarResponse.json();
@@ -558,8 +559,7 @@ export default function AccountPage() {
       }
 
       const response = await axios.post("/api/health/updateSettings", {
-        username,
-        settings: healthSettings,
+      settings: healthSettings,
       });
 
       if (response.data.success) {
@@ -1627,8 +1627,7 @@ export default function AccountPage() {
                         const response = await axios.post(
                           "/api/email-preferences",
                           {
-                            username,
-                            weeklyDigestEnabled: newValue,
+                          weeklyDigestEnabled: newValue,
                           }
                         );
 

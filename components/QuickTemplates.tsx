@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { QuickTemplatesProps, UserContext, Template } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 export default function QuickTemplates({
   username,
@@ -21,8 +22,8 @@ export default function QuickTemplates({
     const fetchUserContext = async () => {
       setLoading(true);
       try {
-        const response = await fetch(
-          `/api/user-context?username=${encodeURIComponent(username)}`
+        const response = await authFetch(
+          `/api/user-context`
         );
         if (response.ok) {
           const data = await response.json();

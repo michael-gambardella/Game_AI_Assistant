@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
-import { HealthMonitoringProps, HealthStatus, StoredTimerData } from "../types";
+import { HealthMonitoringProps, HealthStatus } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 // ADD THESE LINES HERE (after imports):
 // Storage key helper
-const getStorageKey = (username: string) => `vgw_health_timer_${username}`;
 
 const useHealthMonitoring = ({
   username,
@@ -34,8 +34,6 @@ const useHealthMonitoring = ({
   const lastTickAtRef = useRef<number | null>(null);
   // Track current enabled state in a ref so cleanup can check current value
   const isEnabledRef = useRef<boolean>(isEnabled);
-  // Track if timer was restored from localStorage
-  const timerRestoredRef = useRef<boolean>(false);
   // Track if we're currently initializing to prevent double calls
   const isInitializingRef = useRef<boolean>(false);
   // Track if startSession has been called to prevent double calls
@@ -44,85 +42,6 @@ const useHealthMonitoring = ({
   const restoreCompletedRef = useRef<boolean>(false);
   // Track if component is initialized to prevent saving default state before restore
   const isInitializedRef = useRef<boolean>(false);
-
-  // ADD THESE THREE FUNCTIONS HERE (before startSession):
-
-  // Save timer state to localStorage
-  const saveTimerState = () => {
-    if (!username || !isEnabledRef.current) return;
-
-    try {
-      const remainingSec = remainingSecondsOverrideRef.current;
-      const sessionStart = sessionStartTimeRef.current?.getTime();
-
-      if (remainingSec !== null && remainingSec > 0 && sessionStart) {
-        const data: StoredTimerData = {
-          remainingSeconds: remainingSec,
-          timestamp: Date.now(),
-          sessionStartTime: sessionStart,
-          breakIntervalMinutes: breakIntervalMinutesRef.current,
-        };
-
-        localStorage.setItem(getStorageKey(username), JSON.stringify(data));
-        console.log("Timer state saved:", {
-          remainingMinutes: Math.floor(remainingSec / 60),
-          sessionStart: new Date(sessionStart).toISOString(),
-        });
-      }
-    } catch (e) {
-      console.error("Error saving timer state:", e);
-    }
-  };
-
-  // Restore timer state from localStorage
-  const restoreTimerState = (): boolean => {
-    if (!username || !isEnabledRef.current) return false;
-
-    try {
-      const stored = localStorage.getItem(getStorageKey(username));
-      if (!stored) return false;
-
-      const data: StoredTimerData = JSON.parse(stored);
-      const now = Date.now();
-      const elapsedHours = (now - data.timestamp) / (1000 * 60 * 60);
-
-      // Validate: must be within 24 hours
-      if (elapsedHours >= 24) {
-        console.log("Stored timer expired (>24 hours), clearing...");
-        localStorage.removeItem(getStorageKey(username));
-        return false;
-      }
-
-      // Restore state
-      remainingSecondsOverrideRef.current = data.remainingSeconds;
-      lastTickAtRef.current = now;
-      breakIntervalMinutesRef.current = data.breakIntervalMinutes;
-      sessionStartTimeRef.current = new Date(data.sessionStartTime);
-      timerRestoredRef.current = true;
-
-      console.log("Timer state restored:", {
-        remainingMinutes: Math.floor(data.remainingSeconds / 60),
-        elapsedHours: elapsedHours.toFixed(2),
-        sessionStart: new Date(data.sessionStartTime).toISOString(),
-      });
-
-      return true;
-    } catch (e) {
-      console.error("Error restoring timer state:", e);
-      return false;
-    }
-  };
-
-  // Clear timer state from localStorage
-  const clearTimerState = () => {
-    if (!username) return;
-    try {
-      localStorage.removeItem(getStorageKey(username));
-      console.log("Timer state cleared");
-    } catch (e) {
-      console.error("Error clearing timer state:", e);
-    }
-  };
 
   // Function to start a new session (only called for truly new sessions)
   const startSession = async () => {
@@ -136,24 +55,14 @@ const useHealthMonitoring = ({
     // Mark as called to prevent double execution
     startSessionCalledRef.current = true;
 
-    // If timer was restored, skip server call
-    if (timerRestoredRef.current) {
-      console.log("Skipping startSession - timer restored from localStorage");
-      // Reset flag after a delay to allow for retries if needed
-      setTimeout(() => {
-        startSessionCalledRef.current = false;
-      }, 1000);
-      return;
-    }
-
     const now = new Date();
 
     try {
       // Check if there's an existing session to resume
-      const response = await fetch("/api/health/checkStatus", {
+      const response = await authFetch("/api/health/checkStatus", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (response.ok) {
@@ -235,10 +144,10 @@ const useHealthMonitoring = ({
 
     try {
       // Only notify server for a truly new session
-      await fetch("/api/health/startSession", {
+      await authFetch("/api/health/startSession", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, sessionStartTime: now.toISOString() }),
+        body: JSON.stringify({ sessionStartTime: now.toISOString() }),
       });
     } catch (error) {
       console.error("Error starting session:", error);
@@ -254,8 +163,6 @@ const useHealthMonitoring = ({
     accumulatedSessionTimeRef.current += sessionDuration;
     sessionPausedTimeRef.current = now;
     lastActiveTimeRef.current = null;
-
-    saveTimerState();
   };
 
   // Function to resume session (when page becomes visible)
@@ -303,11 +210,10 @@ const useHealthMonitoring = ({
 
     try {
       // Notify server that session ended
-      await fetch("/api/health/endSession", {
+      await authFetch("/api/health/endSession", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username,
           sessionEndTime: new Date().toISOString(),
           sessionDuration: sessionDurationMinutes,
         }),
@@ -356,11 +262,6 @@ const useHealthMonitoring = ({
             remainingSecondsOverrideRef.current - deltaSec
           );
           lastTickAtRef.current = nowMs;
-
-          // Save periodically (every 10 seconds)
-          if (deltaSec % 10 === 0) {
-            saveTimerState();
-          }
         }
       } else {
         // Not visible, don't change remaining seconds
@@ -429,12 +330,12 @@ const useHealthMonitoring = ({
     if (!username) return;
 
     try {
-      const response = await fetch("/api/health/checkStatus", {
+      const response = await authFetch("/api/health/checkStatus", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
@@ -449,12 +350,8 @@ const useHealthMonitoring = ({
         // Store break interval for local calculations
         breakIntervalMinutesRef.current = data.breakIntervalMinutes || 45;
 
-        // Only update break time references if we don't have a restored timer
-        if (
-          !timerRestoredRef.current &&
-          data.lastBreakTime &&
-          !lastBreakTimeRef.current
-        ) {
+        // Only take the server's last break time if we don't already have one
+        if (data.lastBreakTime && !lastBreakTimeRef.current) {
           lastBreakTimeRef.current = new Date(data.lastBreakTime);
         }
 
@@ -618,7 +515,7 @@ const useHealthMonitoring = ({
                   Time for a Break!
                 </p>
                 <p className="text-xs text-white opacity-90">
-                  You've been gaming for a while. Take a quick break!
+                  You&apos;ve been gaming for a while. Take a quick break!
                 </p>
               </div>
             </div>
@@ -676,12 +573,12 @@ const useHealthMonitoring = ({
   // Function to start a break
   const recordBreak = async () => {
     try {
-      const response = await fetch("/api/health/recordBreak", {
+      const response = await authFetch("/api/health/recordBreak", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (response.ok) {
@@ -690,17 +587,13 @@ const useHealthMonitoring = ({
         // Clear any persisted remaining time since a new break started
         remainingSecondsOverrideRef.current = null;
 
-        clearTimerState();
-        timerRestoredRef.current = false;
-
         // Clear from server
         try {
           if (username) {
-            await fetch("/api/health/saveTimerState", {
+            await authFetch("/api/health/saveTimerState", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                username,
                 remainingSeconds: 0,
                 breakIntervalMinutes: breakIntervalMinutesRef.current,
               }),
@@ -741,12 +634,12 @@ const useHealthMonitoring = ({
   // Function to end a break
   const endBreak = async () => {
     try {
-      const response = await fetch("/api/health/endBreak", {
+      const response = await authFetch("/api/health/endBreak", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (response.ok) {
@@ -760,11 +653,10 @@ const useHealthMonitoring = ({
         // Clear from server
         try {
           if (username) {
-            await fetch("/api/health/saveTimerState", {
+            await authFetch("/api/health/saveTimerState", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                username,
                 remainingSeconds: 0,
                 breakIntervalMinutes: breakIntervalMinutesRef.current,
               }),
@@ -803,12 +695,12 @@ const useHealthMonitoring = ({
   // Function to snooze reminder
   const snoozeReminder = async () => {
     try {
-      const response = await fetch("/api/health/snoozeReminder", {
+      const response = await authFetch("/api/health/snoozeReminder", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (response.ok) {
@@ -828,12 +720,12 @@ const useHealthMonitoring = ({
 
     // Mark health tips as shown
     try {
-      await fetch("/api/health/markHealthTipShown", {
+      await authFetch("/api/health/markHealthTipShown", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
     } catch (error) {
       console.error("Error marking health tip as shown:", error);
@@ -930,10 +822,10 @@ const useHealthMonitoring = ({
       // First, try to restore from server (for cross-browser sync)
       const restoreFromServer = async () => {
         try {
-          const response = await fetch("/api/health/getTimerState", {
+          const response = await authFetch("/api/health/getTimerState", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({}),
           });
 
           if (response.ok) {
@@ -1215,11 +1107,10 @@ const useHealthMonitoring = ({
             // Save to server (for cross-browser persistence)
             const saveToServer = async () => {
               try {
-                await fetch("/api/health/saveTimerState", {
+                await authFetch("/api/health/saveTimerState", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    username,
                     remainingSeconds: remainingSec,
                     breakIntervalMinutes: breakIntervalMinutesRef.current,
                   }),
@@ -1249,11 +1140,10 @@ const useHealthMonitoring = ({
             // Clear both server and localStorage if no remaining time
             const clearFromServer = async () => {
               try {
-                await fetch("/api/health/saveTimerState", {
+                await authFetch("/api/health/saveTimerState", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    username,
                     remainingSeconds: 0,
                     breakIntervalMinutes: breakIntervalMinutesRef.current,
                   }),
@@ -1279,8 +1169,9 @@ const useHealthMonitoring = ({
         }
       }
       setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
-      // Do not end the session on unmount due to in-app navigation.
-      // Session end is handled on full unload or explicit logout.
+      // Do not end the session on unmount due to in-app navigation (or on page unload,
+      // which only pauses it so it can resume within 24h). It ends on explicit sign-out:
+      // the page calls endSession() from handleSignOut.
     };
   }, [username, isEnabled, checkInterval]);
 
@@ -1320,11 +1211,10 @@ const useHealthMonitoring = ({
             // Save to server (for cross-browser persistence)
             const saveToServer = async () => {
               try {
-                await fetch("/api/health/saveTimerState", {
+                await authFetch("/api/health/saveTimerState", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    username,
                     remainingSeconds: remainingSec,
                     breakIntervalMinutes: breakIntervalMinutesRef.current,
                   }),
@@ -1399,6 +1289,7 @@ const useHealthMonitoring = ({
     endBreak,
     snoozeReminder,
     checkHealthStatus,
+    endSession,
   };
 };
 

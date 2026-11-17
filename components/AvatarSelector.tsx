@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { AvatarSelectorProps, RecentAvatar } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   isOpen,
@@ -20,10 +21,10 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   const fetchRecentAvatars = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/avatar/recent", {
+      const response = await authFetch("/api/avatar/recent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
@@ -39,13 +40,14 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [username]);
+  }, []);
 
+  // Re-fetch when the signed-in user changes (the API identifies them by cookie)
   useEffect(() => {
     if (isOpen) {
       fetchRecentAvatars();
     }
-  }, [isOpen, fetchRecentAvatars]);
+  }, [isOpen, fetchRecentAvatars, username]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,10 +110,10 @@ const AvatarSelector: React.FC<AvatarSelectorProps> = ({
 
   const handleSetAvatar = async (avatarUrl: string) => {
     try {
-      const response = await fetch("/api/avatar/set", {
+      const response = await authFetch("/api/avatar/set", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, avatarUrl }),
+        body: JSON.stringify({ avatarUrl }),
       });
 
       if (!response.ok) {

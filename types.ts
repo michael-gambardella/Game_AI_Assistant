@@ -916,16 +916,8 @@ export interface RecommendationsDisplayProps {
   onDismiss?: () => void;
 }
 
-// Interface for stored timer data
-export interface StoredTimerData {
-  remainingSeconds: number;
-  timestamp: number;
-  sessionStartTime: number;
-  breakIntervalMinutes: number;
-}
-
+// The user is identified by the session cookie, not the request body
 export interface SaveTimerStateRequest {
-  username: string;
   remainingSeconds: number;
   breakIntervalMinutes: number;
 }
