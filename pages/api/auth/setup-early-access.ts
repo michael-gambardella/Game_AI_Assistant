@@ -4,6 +4,7 @@ import User from '../../../models/User';
 import { hashPassword, validatePassword } from '../../../utils/passwordUtils';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { getSession, setAuthCookiesWithSession } from '../../../utils/session';
+import { isReservedUsername } from '../../../utils/reservedUsernames';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -59,6 +60,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
       return res.status(400).json({ message: 'Username can only contain letters, numbers, underscores, and hyphens' });
+    }
+
+    // Privileged names (admin, automated accounts) can't be taken in any capitalization,
+    // unless this account already holds exactly that name
+    if (username !== user.username && isReservedUsername(username)) {
+      return res.status(409).json({ message: 'That username is unavailable. Please choose another.' });
     }
 
     // Check if username is already taken

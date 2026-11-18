@@ -244,10 +244,10 @@ export default function AccountPage() {
           throw new Error("Unable to determine username");
         }
 
-        const subscriptionResponse = await fetch("/api/checkProAccess", {
+        const subscriptionResponse = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: usernameForProCheck }),
+          body: JSON.stringify({}),
         });
 
         if (!subscriptionResponse.ok) {

@@ -32,11 +32,12 @@ export const validateAdminAccess = (username: string | null | undefined) => {
     };
   }
 
-  const adminUsername = getAdminUsername();
-  
-  // Normalize: trim and collapse spaces
-  const normalized = (s: string) => s.trim().replace(/\s+/g, '').toLowerCase();
-  if (normalized(username) !== normalized(adminUsername)) {
+  // Exact, case-sensitive match against the admin's username. Whitespace is stripped from
+  // the configured value only (usernames can't contain spaces, so "Legendary Renegade" in
+  // the env still means "LegendaryRenegade"). Matching case-insensitively would make a
+  // different account registered as e.g. "legendaryrenegade" an admin.
+  const adminUsername = getAdminUsername().replace(/\s+/g, '');
+  if (username !== adminUsername) {
     return {
       hasAccess: false,
       error: 'Access denied. Admin privileges required.'

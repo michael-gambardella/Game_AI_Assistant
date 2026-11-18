@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { hasCronSecret } from '../../../middleware/auth';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import {
   aggregatePreviousHour,
@@ -38,8 +39,10 @@ import { logger } from '../../../utils/logger';
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Optional: Add authentication check
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Scheduled jobs authenticate with Authorization: Bearer <CRON_SECRET>. hasCronSecret
+  // also refuses everything if CRON_SECRET is unset (a plain string compare would accept
+  // the literal header "Bearer undefined" in that case).
+  if (!hasCronSecret(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

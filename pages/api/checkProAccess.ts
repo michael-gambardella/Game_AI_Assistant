@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { checkProAccess } from '../../utils/proAccessUtil';
 import { connectToWingmanDB } from '../../utils/databaseConnections';
 import User from '../../models/User';
+import { requireUser } from '../../middleware/auth';
 
 export default async function handler(
   req: NextApiRequest,
@@ -12,11 +13,11 @@ export default async function handler(
   }
 
   try {
-    const { username, userId } = req.body;
-
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
-    }
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    // Pro status is only ever reported for the signed-in user
+    const { username, userId } = authUser;
 
     // Check basic Pro access with error handling
     let hasProAccess = false;
@@ -34,15 +35,7 @@ export default async function handler(
       try {
         await connectToWingmanDB();
         
-        // Find all users with this username
-        const allUsers = await User.find({ 
-          $or: [
-            { username },
-            ...(userId ? [{ userId }] : [])
-          ]
-        }).limit(10); // Limit to prevent excessive queries
-        
-        const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
+        const user = await User.findOne({ userId });
 
         // If user has Pro access, get detailed subscription status
         if (user && user.hasProAccess && typeof user.getSubscriptionStatus === 'function') {

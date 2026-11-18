@@ -6,6 +6,7 @@ import { sendWelcomeEmail } from '../../../utils/emailService';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
 import { setAuthCookiesWithSession } from '../../../utils/session';
+import { isReservedUsername } from '../../../utils/reservedUsernames';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,6 +69,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(409).json({ 
         message: 'An account with this email address already exists' 
       });
+    }
+
+    // Privileged names (admin, automated accounts) can't be taken in any capitalization
+    if (isReservedUsername(username)) {
+      return res.status(409).json({ message: 'That username is unavailable. Please choose another.' });
     }
 
     // Check if username already exists

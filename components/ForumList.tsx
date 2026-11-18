@@ -5,6 +5,7 @@ import { useForum } from "../context/ForumContext";
 import { Forum } from "../types";
 import CreateForum from "./CreateForum";
 import Link from "next/link";
+import { authFetch } from "../utils/authFetch";
 
 const categoryLabels: Record<string, string> = {
   speedruns: "Speedruns",
@@ -39,7 +40,6 @@ export default function ForumList() {
     const checkProAccess = async () => {
       try {
         const username = localStorage.getItem("username");
-        const userId = localStorage.getItem("userId");
 
         // Only check Pro access if user is logged in
         if (!username) {
@@ -47,10 +47,10 @@ export default function ForumList() {
           return;
         }
 
-        const response = await fetch("/api/checkProAccess", {
+        const response = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, userId }),
+          body: JSON.stringify({}),
         });
 
         if (!response.ok) {

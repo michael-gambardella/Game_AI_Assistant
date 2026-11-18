@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
 import { verifyAccessToken, extractTokenFromHeader } from '../utils/jwt';
 import { getTokenFromCookies, ACCESS_TOKEN_COOKIE } from '../utils/session';
 import { connectToWingmanDB } from '../utils/databaseConnections';
@@ -181,3 +182,17 @@ export const requireAdminUser = async (
   return user;
 };
 
+/**
+ * True if the request carries `Authorization: Bearer <CRON_SECRET>` (how scheduled jobs
+ * authenticate, as in pages/api/cron/*). Constant-time compare; false if CRON_SECRET unset.
+ */
+export const hasCronSecret = (req: NextApiRequest): boolean => {
+  const secret = process.env.CRON_SECRET;
+  const header = req.headers.authorization;
+  if (!secret || typeof header !== 'string') {
+    return false;
+  }
+  const a = crypto.createHash('sha256').update(header).digest();
+  const b = crypto.createHash('sha256').update(`Bearer ${secret}`).digest();
+  return crypto.timingSafeEqual(a, b);
+};

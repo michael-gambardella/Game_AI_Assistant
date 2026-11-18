@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useForum } from "../context/ForumContext";
+import { authFetch } from "../utils/authFetch";
 
 export default function CreateForum() {
   const [title, setTitle] = useState("");
@@ -17,12 +18,11 @@ export default function CreateForum() {
   useEffect(() => {
     const checkProAccess = async () => {
       try {
-        const username = localStorage.getItem("username");
-        const userId = localStorage.getItem("userId");
-        const response = await fetch("/api/checkProAccess", {
+        // Checks the signed-in user (auth cookie)
+        const response = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, userId }),
+          body: JSON.stringify({}),
         });
         const data = await response.json();
         setHasProAccess(data.hasProAccess);

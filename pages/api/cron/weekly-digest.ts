@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../../utils/withDatabase';
+import { hasCronSecret } from '../../../middleware/auth';
 import User from '../../../models/User';
 import {
   getWeeklyAchievements,
@@ -88,8 +89,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Authenticate cron requests using a shared secret
   // Set CRON_SECRET in your environment variables and configure your cron
   // service to send: Authorization: Bearer <CRON_SECRET>
-  const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!hasCronSecret(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

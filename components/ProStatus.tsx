@@ -21,10 +21,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
       try {
         // Fetch subscription status for Pro users
         if (hasProAccess) {
-          const response = await fetch("/api/checkProAccess", {
+          const response = await authFetch("/api/checkProAccess", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
+            body: JSON.stringify({}),
           });
           const data = await response.json();
 

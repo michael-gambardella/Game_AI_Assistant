@@ -4,6 +4,7 @@ import User from '../../models/User';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { getSession, setAuthCookiesWithSession } from '../../utils/session';
 import { hasOrphanedUsernameData, renameUsernameEverywhere } from '../../utils/renameUser';
+import { isReservedUsername } from '../../utils/reservedUsernames';
 
 /**
  * Changes the signed-in user's username (with content moderation).
@@ -91,6 +92,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         offendingWords: contentCheck.offendingWords,
         violationResult
       });
+    }
+
+    // Privileged names (admin, automated accounts) can't be taken in any capitalization
+    if (isReservedUsername(newUsername)) {
+      return res.status(409).json({ message: 'That username is unavailable. Please choose another.' });
     }
 
     const usernameTaken = await User.findOne({ username: newUsername, userId: { $ne: user.userId } });

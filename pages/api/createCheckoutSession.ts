@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { withWingmanDB } from '../../utils/withDatabase';
+import { requireUser } from '../../middleware/auth';
 import User from '../../models/User';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -13,11 +14,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { username, userId } = req.body;
-
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
-    }
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
 
     if (!process.env.STRIPE_WINGMAN_PRO_PRICE_ID) {
       return res.status(500).json({ 
@@ -26,13 +25,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
 
-    // Find the user
-    const user = await User.findOne({ 
-      $or: [
-        { username },
-        { userId }
-      ]
-    });
+    // Checkout is always for the signed-in user's own account (and Stripe customer)
+    const user = await User.findOne({ userId: authUser.userId });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

@@ -4,6 +4,7 @@ import User from '../models/User';
 import { ISplashUser } from '../types';
 import connectToMongoDB from './mongodb';
 import { PRO_DEADLINE, EARLY_ACCESS_START_DATE, EARLY_ACCESS_END_DATE } from './earlyAccessConfig';
+import { AUTOMATED_USERNAMES, TEST_USERNAMES } from './reservedUsernames';
 
 // SplashDB User schema
 // Explicitly set collection name to 'users' since that's where the data is stored in splash database
@@ -20,14 +21,15 @@ const splashUserSchema = new Schema<ISplashUser>({
 // Check pro access for a user
 export const checkProAccess = async (identifier: string, userId?: string): Promise<boolean> => {
   // Always grant Pro access for test/dev user (with username)
-  if (identifier === "test-user" || identifier === "TestUser1") return true;
+  // (dev only: in production these names aren't registered, so granting them Pro by name
+  // would hand free Pro to whoever signed up with one - see reservedUsernames.ts)
+  if (process.env.NODE_ENV !== 'production' && TEST_USERNAMES.includes(identifier)) return true;
   
   // Always grant Pro access for LegendaryRenegade (Master account)
   if (identifier === "LegendaryRenegade") return true;
   
   // Always grant Pro access for automated users
-  const automatedUsers = ["MysteriousMrEnter", "WaywardJammer", "InterdimensionalHipster"];
-  if (automatedUsers.includes(identifier)) return true;
+  if (AUTOMATED_USERNAMES.includes(identifier)) return true;
   
   try {
     await connectToWingmanDB();

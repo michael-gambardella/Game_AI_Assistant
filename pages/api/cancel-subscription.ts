@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../utils/withDatabase';
+import { requireUser } from '../../middleware/auth';
 import User from '../../models/User';
 import Stripe from 'stripe';
 
@@ -16,15 +17,13 @@ async function handler(
   }
 
   try {
-    const { username } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
 
-    if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
-    }
-
-
-    // Find the user
-    const user = await User.findOne({ username });
+    // Only the signed-in user's own subscription can be canceled
+    const user = await User.findOne({ userId: authUser.userId });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

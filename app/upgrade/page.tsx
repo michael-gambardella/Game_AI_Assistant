@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SubscriptionStatus } from "@/types";
+import { authFetch } from "../../utils/authFetch";
 
 const ProFeatures = [
   {
@@ -75,10 +76,10 @@ function UpgradePageContent() {
           setCancelMessage("Payment was canceled. You can try again anytime.");
         }
 
-        const response = await fetch("/api/checkProAccess", {
+        const response = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({}),
         });
 
         if (!response.ok) {
@@ -108,7 +109,6 @@ function UpgradePageContent() {
   const handleUpgradeClick = async () => {
     try {
       const username = localStorage.getItem("username");
-      const userId = localStorage.getItem("userId");
 
       if (!username) {
         alert("Please sign in to upgrade your subscription.");
@@ -124,10 +124,10 @@ function UpgradePageContent() {
         button.textContent = "Processing...";
       }
 
-      const response = await fetch("/api/createCheckoutSession", {
+      const response = await authFetch("/api/createCheckoutSession", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, userId }),
+        body: JSON.stringify({}),
       });
 
       const data = await response.json();

@@ -129,7 +129,6 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   // Function to update username and check Pro access
   const updateUserData = useCallback(async () => {
     const storedUsername = localStorage.getItem("username");
-    const storedUserId = localStorage.getItem("userId");
 
     // Always read fresh from localStorage and update state
     setUsername(storedUsername);
@@ -137,13 +136,10 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     // Check Pro access only if we have a username
     if (storedUsername) {
       try {
-        const response = await fetch("/api/checkProAccess", {
+        const response = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: storedUsername,
-            userId: storedUserId,
-          }),
+          body: JSON.stringify({}),
         });
         const data = await response.json();
         setHasProAccess(data.hasProAccess);

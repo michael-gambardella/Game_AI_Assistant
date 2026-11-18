@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { SubscriptionData } from "../../types";
+import { authFetch } from "../../utils/authFetch";
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();
@@ -26,10 +27,10 @@ export default function ManageSubscriptionPage() {
         }
 
         // Fetch subscription status
-        const response = await fetch("/api/checkProAccess", {
+        const response = await authFetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({}),
         });
 
         if (!response.ok) {
@@ -83,10 +84,10 @@ export default function ManageSubscriptionPage() {
       }
 
       // Call the cancellation API
-      const response = await fetch("/api/cancel-subscription", {
+      const response = await authFetch("/api/cancel-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
@@ -94,16 +95,21 @@ export default function ManageSubscriptionPage() {
         throw new Error(errorData.message || "Failed to cancel subscription");
       }
 
+      // Stripe subscriptions keep Pro until the paid period ends; legacy Pro (no Stripe
+      // subscription) is removed immediately - so the message depends on the outcome
       const result = await response.json();
       setSuccess(
-        "Your subscription has been canceled. You will retain Pro access until the end of your current billing period."
+        result.subscriptionStatus === "canceled_at_period_end" && result.accessUntil
+          ? `Your subscription has been canceled. You will retain Pro access until ${formatDate(result.accessUntil)}.`
+          : result.message ||
+              "Your subscription has been canceled and Pro access has been removed."
       );
 
       // Refresh subscription data
-      const refreshResponse = await fetch("/api/checkProAccess", {
+      const refreshResponse = await authFetch("/api/checkProAccess", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({}),
       });
 
       if (refreshResponse.ok) {

@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withWingmanDB } from '../../utils/withDatabase';
+import { requireAdminUser } from '../../middleware/auth';
 import User from '../../models/User';
 
 async function handler(
@@ -10,10 +11,15 @@ async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  // Admin-only debugging tool: returns a user's full subscription record (Stripe IDs etc.)
+  const admin = await requireAdminUser(req, res);
+  if (!admin) return;
+
   try {
     const { username } = req.query;
 
-    if (!username) {
+    // String only - an object would be treated as a MongoDB query operator
+    if (typeof username !== 'string' || !username) {
       return res.status(400).json({ message: 'Username is required' });
     }
 
