@@ -127,6 +127,7 @@ const OFFENSIVE_WORDS = [
   'motherfucking',
   'J.D. Vance',
   'Elon Musk',
+  'Jensen Huang',
   'Tulsi Gabbard',
   'Tucker Carlson',
   'Jesse Watters',
@@ -546,7 +547,6 @@ const OFFENSIVE_WORDS = [
  */
 export const containsOffensiveContent = async (content: string, userId: string) => {
   // First do a quick local check using word boundaries to match whole words only
-  const lowercaseContent = content.toLowerCase();
   const foundWords = OFFENSIVE_WORDS.filter(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // (?<!\w) and (?!\w) act like \b but also work when the entry starts/ends

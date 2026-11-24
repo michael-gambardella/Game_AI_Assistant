@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
 import { HotTopicSummary } from "../../types";
+import { getAuthenticatedUser } from "../../middleware/auth";
 
 const TRENDING_LIMIT = 3;
 const NEW_THIS_WEEK_LIMIT = 5;
@@ -17,14 +18,16 @@ async function handler(
 
   try {
 
-    const username =
-      (req.query.username as string) || (req.headers.username as string) || "test-user";
+    // Private forums are included only for the signed-in user's memberships (never a
+    // username from the query/headers). Signed out: public forums only.
+    const viewer = await getAuthenticatedUser(req);
+    const visibility = viewer
+      ? { $or: [{ isPrivate: false }, { allowedUsers: viewer.username }] }
+      : { isPrivate: false };
 
     const accessConditions: Record<string, any> = {
       $and: [
-        {
-          $or: [{ isPrivate: false }, { allowedUsers: username }],
-        },
+        visibility,
         { "metadata.status": "active" },
       ],
     };

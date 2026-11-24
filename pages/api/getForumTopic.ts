@@ -3,24 +3,31 @@ import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { getEffectiveForumStatus } from '../../utils/forumStatus';
 import { hasForumAccess } from '../../utils/forumAuth';
+import { getAuthenticatedUser } from '../../middleware/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { forumId, username, incrementView } = req.query;
+  const { forumId, incrementView } = req.query;
 
-  if (!forumId) {
+  // String only - an object would be treated as a MongoDB query operator
+  if (typeof forumId !== 'string' || !forumId) {
     return res.status(400).json({ error: 'Forum ID is required' });
   }
+
+  // Viewer is the signed-in user, if any. Signed-out visitors can read public forums;
+  // private forums need a member's session (a ?username= in the URL proves nothing).
+  const viewer = await getAuthenticatedUser(req);
+  const username = viewer?.username ?? '';
 
   try {
     
     // Log request for debugging in production
     console.log('getForumTopic request:', {
       forumId: req.query.forumId,
-      username: req.query.username,
+      username: username || '(signed out)',
       timestamp: new Date().toISOString()
     });
     
@@ -118,7 +125,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             error: saveError instanceof Error ? saveError.message : String(saveError),
             stack: saveError instanceof Error ? saveError.stack : undefined,
             forumId: req.query.forumId,
-            username: req.query.username
+            username: username || '(signed out)'
           });
           // Continue execution even if save fails - the view count increment is not critical
         }
@@ -245,7 +252,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       forumId: req.query.forumId,
-      username: req.query.username,
+      username: username || '(signed out)',
       timestamp: new Date().toISOString()
     });
     return res.status(500).json({ 

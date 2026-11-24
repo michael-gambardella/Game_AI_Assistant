@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
+import { requireUser } from '../../middleware/auth';
+import { validateAdminAccess } from '../../utils/adminAccess';
+import { isForumOwner } from '../../utils/forumAuth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -8,9 +11,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Only the forum's creator (or the admin) may add members. This used to have no check
+    // at all, so anyone could add themselves to any private forum by its title.
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+
     const { forumTitle, usernameToAdd } = req.body;
 
-    if (!forumTitle || !usernameToAdd) {
+    if (typeof forumTitle !== 'string' || !forumTitle || typeof usernameToAdd !== 'string' || !usernameToAdd.trim()) {
       return res.status(400).json({ error: 'forumTitle and usernameToAdd are required' });
     }
 
@@ -19,6 +27,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     
     if (!forum) {
       return res.status(404).json({ error: `Forum "${forumTitle}" not found` });
+    }
+
+    if (!isForumOwner(forum, authUser.username) && !validateAdminAccess(authUser.username).hasAccess) {
+      return res.status(403).json({ error: 'Only the forum creator can add members' });
     }
 
     console.log(`Found forum: ${forum.title}`);

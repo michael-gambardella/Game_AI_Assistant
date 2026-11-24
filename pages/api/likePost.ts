@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from "../../models/Forum";
+import { hasForumAccess } from "../../utils/forumAuth";
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -8,7 +10,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { forumId, postId, username } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
+    const { forumId, postId } = req.body;
 
     if (!forumId || !postId || !username) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -17,6 +23,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: "Forum not found" });
+    }
+
+    // Private forums: only members can like/react (same rule as reading and posting)
+    if (!hasForumAccess(forum, username)) {
+      return res.status(403).json({ error: "Not authorized to access this forum" });
     }
 
     const post = forum.posts.id(postId);

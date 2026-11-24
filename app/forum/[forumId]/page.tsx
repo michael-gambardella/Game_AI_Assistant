@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, use } from "react";
 import { useForum } from "../../../context/ForumContext";
 import { ForumProvider } from "../../../context/ForumContext";
-import axios from "axios";
+import axios from "../../../utils/axiosConfig";
 import { useRouter } from "next/navigation";
 import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
 import toast from "react-hot-toast";
@@ -34,7 +34,6 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     addPost,
     editPost,
     deletePost,
-    likePost,
     reactToPost,
     updateForumStatus,
   } = useForum();
@@ -97,9 +96,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   useEffect(() => {
     const fetchForum = async () => {
       try {
-        const username = localStorage.getItem("username") || "test-user";
         const response = await axios.get(
-          `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
+          `/api/getForumTopic?forumId=${params.forumId}`
         );
         setCurrentForum(response.data);
         // Track forum view
@@ -208,7 +206,6 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   };
 
   const [isPosting, setIsPosting] = useState(false);
-  const [postStatus, setPostStatus] = useState<string | null>(null);
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -226,7 +223,6 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
 
     try {
-      setPostStatus(null);
       await addPost(
         params.forumId,
         message,
@@ -285,9 +281,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       if (fileInput) fileInput.value = "";
 
       // Fetch updated forum data
-      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
+        `/api/getForumTopic?forumId=${params.forumId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -361,8 +356,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             const details =
               errorData.details ||
               "The image contains content that violates our community guidelines";
-            // Don't set error state - only show toast popup
-            toast.error(message, {
+            // Don't set error state - only show toast popup (with the reason it was flagged)
+            toast.error(`${message} Reason: ${details}.`, {
               duration: 6000,
               style: {
                 background: "#fee2e2",
@@ -485,9 +480,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       if (fileInput) fileInput.value = "";
 
       // Fetch updated forum data
-      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
+        `/api/getForumTopic?forumId=${params.forumId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -682,9 +676,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       setShowDeleteConfirm(false);
       setPostToDelete(null);
       // Fetch updated forum data
-      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
+        `/api/getForumTopic?forumId=${params.forumId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -699,20 +692,6 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const cancelDeletePost = () => {
     setShowDeleteConfirm(false);
     setPostToDelete(null);
-  };
-
-  const handleLikePost = async (postId: string) => {
-    try {
-      await likePost(params.forumId, postId);
-      // Fetch updated forum data so the UI reflects the new like state/count
-      const username = localStorage.getItem("username") || "test-user";
-      const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
-      );
-      setCurrentForum(response.data);
-    } catch (err: any) {
-      setError(err.message || "Failed to like post");
-    }
   };
 
   const handleReactToPost = async (postId: string, reactionType: string) => {
@@ -893,9 +872,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       if (fileInput) fileInput.value = "";
 
       // Fetch updated forum data
-      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
+        `/api/getForumTopic?forumId=${params.forumId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {

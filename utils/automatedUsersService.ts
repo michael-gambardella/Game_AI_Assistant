@@ -16,6 +16,7 @@ import mongoose from 'mongoose';
 import { normalizeForumCategory, forumCategoryDisplayName } from './forumCategory';
 import { getGameModeProfile, getPrimaryGenreForGame, getAllGenresForGame } from './gameCatalog';
 import { LRUCache } from './cacheManager';
+import { getAutomatedUserAuthHeaders } from './automatedAuth';
 
 /**
  * Cache for user preferences to avoid repeated database queries
@@ -623,6 +624,9 @@ export async function askQuestion(
     try {
       const response = await withRetry(
         async () => {
+          // /api/assistant requires a session: sign in as the automated account, with a
+          // fresh short-lived token per attempt (see utils/automatedAuth.ts)
+          const authHeaders = await getAutomatedUserAuthHeaders(username);
           return await withTimeout(
             axios.post(
               apiUrl,
@@ -630,7 +634,8 @@ export async function askQuestion(
               {
                 timeout: timeoutMs,
                 headers: {
-                  'Content-Type': 'application/json'
+                  'Content-Type': 'application/json',
+                  ...authHeaders
                 }
               }
             ),
@@ -884,7 +889,6 @@ async function createForumForGame(
       }
     }
 
-    const gameTitleNormalized = normalizeGameTitle(gameTitle);
     const normalizedCategory = normalizeForumCategory(selectedCategory).toLowerCase();
 
     // Find all active forums for this game (case-insensitive)
@@ -1230,7 +1234,6 @@ export async function createForumPost(
     const shouldPrioritizeNewForums = Math.random() < 0.7;
 
     let gameSelection: { gameTitle: string; genre: string } | null = null;
-    let selectedFromExistingForums = false;
     let shouldCreateNewForum = false;
 
     if (shouldPrioritizeNewForums) {
@@ -1284,7 +1287,6 @@ export async function createForumPost(
         const forumGenre = determineGenreFromGame(forumGameTitle);
         if (forumGameTitle && forumGenre) {
           gameSelection = { gameTitle: forumGameTitle, genre: forumGenre };
-          selectedFromExistingForums = true;
           console.log(`[FORUM POST] Selected game from existing forum: ${forumGameTitle} (will post to existing)`);
         }
       }
@@ -1313,7 +1315,6 @@ export async function createForumPost(
     // CRITICAL: Determine the category FIRST before checking for existing forums
     // This ensures we check for forums with the same game AND category
     // Available categories: speedruns, gameplay, mods, general, help
-    const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
     const categoryWeights: { [key: string]: number } = {
       'gameplay': 0.35,      // 35% - most common
       'general': 0.30,       // 30% - also common
@@ -1935,14 +1936,16 @@ export async function likePost(
     const baseUrl = getBaseUrl();
     const apiUrl = `${baseUrl}/api/likePost`;
     const timeoutMs = 30000; // 30 second timeout for like operations
+    // The like is attributed to the signed-in caller, so sign in as the automated account
     const requestData = {
       forumId,
-      postId,
-      username
+      postId
     };
 
     const response = await withRetry(
       async () => {
+        // Fresh short-lived token per attempt (see utils/automatedAuth.ts)
+        const authHeaders = await getAutomatedUserAuthHeaders(username);
         return await withTimeout(
           axios.post(
             apiUrl,
@@ -1950,7 +1953,8 @@ export async function likePost(
             {
               timeout: timeoutMs,
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...authHeaders
               }
             }
           ),

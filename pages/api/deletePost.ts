@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
 import { isPostOwner } from '../../utils/forumAuth';
@@ -9,7 +10,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const { forumId, postId } = req.query;
-  const { username } = req.body;
+  // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+  const authUser = await requireUser(req, res);
+  if (!authUser) return;
+  const { username } = authUser;
 
   if (!forumId || !postId) {
     return res.status(400).json({ error: 'Missing forumId or postId' });

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PrivateForumUserManagementProps } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 export default function PrivateForumUserManagement({
   forumId,
@@ -52,13 +53,12 @@ export default function PrivateForumUserManagement({
 
       // Add user to allowed users
       const updatedUsers = [...allowedUsers, newUsername.trim()];
-      const response = await fetch("/api/updateForumsAllowedUsers", {
+      const response = await authFetch("/api/updateForumsAllowedUsers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           forumId,
           allowedUsers: updatedUsers,
-          username: currentUsername,
         }),
       });
 
@@ -91,13 +91,12 @@ export default function PrivateForumUserManagement({
       const updatedUsers = allowedUsers.filter(
         (user) => user !== usernameToRemove
       );
-      const response = await fetch("/api/updateForumsAllowedUsers", {
+      const response = await authFetch("/api/updateForumsAllowedUsers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           forumId,
           allowedUsers: updatedUsers,
-          username: currentUsername,
         }),
       });
 

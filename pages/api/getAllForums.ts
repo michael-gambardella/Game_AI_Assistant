@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
-import { validateUserAuthentication } from '../../utils/validation';
+import { getAuthenticatedUser } from '../../middleware/auth';
 import { normalizeForumCategory } from '../../utils/forumCategory';
 import { getEffectiveForumStatus } from '../../utils/forumStatus';
 
@@ -16,19 +16,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Use test user for local development if user-id is not provided
-    let username = req.headers['username'] as string;
-    if (!username) {
-      username = 'test-user';
-    }
-
-    // Validate user authentication only if not test user
-    if (username !== 'test-user') {
-      const userAuthErrors = validateUserAuthentication(username);
-      if (userAuthErrors.length > 0) {
-        return res.status(401).json({ error: userAuthErrors[0] });
-      }
-    }
+    // Private forums are listed only for the signed-in user's memberships (never a
+    // username header). Signed out: public forums only.
+    const viewer = await getAuthenticatedUser(req);
 
     // Get pagination parameters
     const page = parseInt(req.query.page as string) || 1;
@@ -42,10 +32,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build query conditions: list forums that are active or inactive (exclude archived)
     const baseConditions: Record<string, any> = {
-      $or: [
-        { isPrivate: false },
-        { allowedUsers: username }
-      ],
+      ...(viewer
+        ? { $or: [{ isPrivate: false }, { allowedUsers: viewer.username }] }
+        : { isPrivate: false }),
       'metadata.status': { $in: ['active', 'inactive'] }
     };
 

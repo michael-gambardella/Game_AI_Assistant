@@ -1,11 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { checkProAccess } from '../utils/proAccessUtil';
+import { requireUser } from './auth';
 
 type AsyncApiHandler = (req: NextApiRequest, res: NextApiResponse) => Promise<void>;
 
 /**
  * HOC that enforces pro access on an API route.
- * Extracts username from req.body or req.query, returns 403 if not pro.
+ * Checks the signed-in user (session cookie / Bearer access token) - never a username from
+ * the request, which would let a free user claim to be a Pro account. 401 if not signed in,
+ * 403 if not Pro.
  * Usage: export default withDatabase(withProAccess(handler))
  */
 export function withProAccess(
@@ -13,16 +16,10 @@ export function withProAccess(
   errorMessage = 'Pro access required. Upgrade to Wingman Pro.'
 ): AsyncApiHandler {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    const username =
-      (typeof req.body?.username === 'string' && req.body.username) ||
-      (typeof req.query?.username === 'string' && req.query.username) ||
-      null;
+    const user = await requireUser(req, res);
+    if (!user) return;
 
-    if (!username) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    const hasAccess = await checkProAccess(username);
+    const hasAccess = await checkProAccess(user.username, user.userId);
     if (!hasAccess) {
       return res.status(403).json({ error: errorMessage });
     }

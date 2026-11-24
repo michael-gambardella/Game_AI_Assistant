@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import formidable from 'formidable';
 import path from 'path';
 import fs from 'fs';
@@ -117,6 +118,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Uploader is the signed-in user (rate limits and image violations are recorded against
+  // them) - never a username form field. Checked before the upload is parsed.
+  const authUser = await requireUser(req, res);
+  if (!authUser) return;
+  const { username } = authUser;
+
   try {
     // Create temp uploads directory if it doesn't exist
     if (!fs.existsSync(tempUploadDir)) {
@@ -138,16 +145,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    const [fields, files] = await form.parse(req);
+    const [, files] = await form.parse(req);
     const uploadedFiles = files.image || files.images || [];
     
-    // Extract username from form fields
-    const username = Array.isArray(fields.username) ? fields.username[0] : fields.username;
-    
-    if (!username || typeof username !== 'string') {
-      return res.status(400).json({ error: 'Username is required' });
-    }
-
     // Check rate limiting per user before processing files
     const rateLimitCheck = await checkImageUploadRateLimit(username);
     if (!rateLimitCheck.allowed) {

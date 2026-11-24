@@ -204,15 +204,12 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     }
   }, []);
 
-  const fetchHotTopics = useCallback(async (user?: string | null) => {
-    const effectiveUsername =
-      user || localStorage.getItem("username") || "test-user";
+  // Private forums in hot topics come from the signed-in session (auth cookie)
+  const fetchHotTopics = useCallback(async () => {
     setHotTopicsLoading(true);
     setHotTopicsError(null);
     try {
-      const response = await fetch(
-        `/api/hotTopics?username=${encodeURIComponent(effectiveUsername)}`
-      );
+      const response = await authFetch(`/api/hotTopics`);
       if (!response.ok) {
         throw new Error(`Failed to fetch hot topics (${response.status})`);
       }
@@ -298,7 +295,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   }, [updateUserData]);
 
   useEffect(() => {
-    fetchHotTopics(username);
+    // Re-fetch when the signed-in user changes (their private forums differ)
+    fetchHotTopics();
   }, [username, fetchHotTopics]);
 
   // Reset currentPage when conversations are refreshed from parent (e.g., after new question)

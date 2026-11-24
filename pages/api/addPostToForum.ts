@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import mongoose from 'mongoose';
 import { withDatabase } from '../../utils/withDatabase';
 import Forum from '../../models/Forum';
@@ -12,7 +13,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { forumId, message, username, attachments, replyTo } = req.body;
+    // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+    const authUser = await requireUser(req, res);
+    if (!authUser) return;
+    const { username } = authUser;
+    const { forumId, message, attachments, replyTo } = req.body;
 
     // Log the request for debugging (especially for 400 errors)
     console.log('addPostToForum request:', {

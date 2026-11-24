@@ -27,12 +27,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       if (filters?.category?.trim()) params.set("category", filters.category.trim());
       if (filters?.sort) params.set("sort", filters.sort);
       const response = await axios.get(
-        `/api/getAllForums?${params.toString()}`,
-        {
-          headers: {
-            username: localStorage.getItem("username") || "test-user",
-          },
-        }
+        `/api/getAllForums?${params.toString()}`
       );
       setForums(response.data.forums);
       setPagination(response.data.pagination || null);
@@ -70,14 +65,6 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         "/api/createForum",
         {
           ...forumData,
-          username: localStorage.getItem("username"),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("userId") || "test-user"
-            }`,
-          },
         }
       );
       const newForum = response.data.forum;
@@ -104,13 +91,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     async (forumId: string) => {
       try {
         setLoading(true);
-        await axios.delete(`/api/deleteForum?forumId=${forumId}`, {
-          headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("userId") || "test-user"
-            }`,
-          },
-        });
+        await axios.delete(`/api/deleteForum?forumId=${forumId}`);
         setForums((prevForums) => prevForums.filter((f) => f._id !== forumId));
         if (currentForum?._id === forumId) {
           setCurrentForum(null);
@@ -146,11 +127,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           imageFiles.forEach((file) => {
             formData.append("image", file);
           });
-          // Add username for violation tracking
-          const username = localStorage.getItem("username");
-          if (username) {
-            formData.append("username", username);
-          }
+          // (uploader is identified by the auth cookie; violations are recorded against them)
 
           try {
             const uploadResponse = await axios.post(
@@ -217,16 +194,8 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             message,
-            username: localStorage.getItem("username"),
             attachments,
             replyTo,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
           }
         );
 
@@ -310,11 +279,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           imageFiles.forEach((file) => {
             formData.append("image", file);
           });
-          // Add username for violation tracking
-          const username = localStorage.getItem("username");
-          if (username) {
-            formData.append("username", username);
-          }
+          // (uploader is identified by the auth cookie; violations are recorded against them)
 
           try {
             const uploadResponse = await axios.post(
@@ -384,15 +349,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           `/api/editPost?forumId=${forumId}&postId=${postId}`,
           {
             message,
-            username: localStorage.getItem("username"),
             attachments: attachments.length > 0 ? attachments : undefined,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
           }
         );
 
@@ -420,17 +377,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       try {
         setLoading(true);
         const response = await axios.delete(
-          `/api/deletePost?forumId=${forumId}&postId=${postId}`,
-          {
-            data: {
-              username: localStorage.getItem("username"),
-            },
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
-          }
+          `/api/deletePost?forumId=${forumId}&postId=${postId}`
         );
 
         const updatedForum = response.data.forum;
@@ -459,14 +406,6 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             postId,
-            username: localStorage.getItem("username"),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
           }
         );
 
@@ -496,15 +435,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             postId,
-            username: localStorage.getItem("username"),
             reactionType,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
           }
         );
 
@@ -536,14 +467,6 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             allowedUsers,
-            username: localStorage.getItem("username"),
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${
-                localStorage.getItem("userId") || "test-user"
-              }`,
-            },
           }
         );
 
