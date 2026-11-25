@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdminOrCron } from '../../../middleware/auth';
 import { withWingmanDB } from '../../../utils/withDatabase';
 import User from '../../../models/User';
 
@@ -13,6 +14,10 @@ import User from '../../../models/User';
  * 4. Specific fake email domains: @ymail.com, @smail.com, @rmail.com, @dmail.com
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Operations endpoint: admin session or scheduled job (Authorization: Bearer <CRON_SECRET>).
+  // Previously unauthenticated - anyone could run it.
+  if (!(await requireAdminOrCron(req, res))) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

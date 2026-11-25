@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
+import { ensureTokenValid } from "../../utils/tokenRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -26,15 +27,12 @@ function TwitchViewerLandingContent() {
   }, [authStatus, twitchUsername, router]);
 
   // Handle linking the Twitch account
-  const handleLinkAccount = () => {
+  const handleLinkAccount = async () => {
     setIsLinking(true);
-    // Get username from localStorage as fallback if session is expired
-    const username = localStorage.getItem("username");
-    // Redirect to OAuth flow with username as query parameter
-    const loginUrl = username
-      ? `/api/twitchViewerLogin?username=${encodeURIComponent(username)}`
-      : "/api/twitchViewerLogin";
-    window.location.href = loginUrl;
+    // The account to link comes from the session: refresh it first (an idle tab's access
+    // token may have expired, and a page navigation can't refresh it), then start OAuth
+    await ensureTokenValid();
+    window.location.href = "/api/twitchViewerLogin";
   };
 
   // Get error message based on error code

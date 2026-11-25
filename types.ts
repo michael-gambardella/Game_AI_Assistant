@@ -351,8 +351,8 @@ export interface PrivateForumUserManagementProps {
   onUsersUpdated: (newUsers: string[]) => void;
 }
 
+// The user is identified by the session cookie, not the request body
 export interface CheckNewAchievementsRequest {
-  username: string;
   lastChecked: string | null; // ISO string or null
 }
 

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 
@@ -10,7 +11,10 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { username } = req.query;
+  // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+  const authUser = await requireUser(req, res);
+  if (!authUser) return;
+  const { username } = authUser;
 
   if (!username || typeof username !== 'string') {
     return res.status(400).json({ error: 'Username is required' });

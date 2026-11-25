@@ -1,20 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import SubscriptionCleanupService from '../../utils/subscriptionCleanupService';
-import { getAuthenticatedUser, hasCronSecret } from '../../middleware/auth';
-import { validateAdminAccess } from '../../utils/adminAccess';
+import { requireAdminOrCron } from '../../middleware/auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Operations endpoint: callable by a scheduled job (Authorization: Bearer <CRON_SECRET>)
   // or the signed-in admin - never anonymously
-  if (!hasCronSecret(req)) {
-    const user = await getAuthenticatedUser(req);
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-    if (!validateAdminAccess(user.username).hasAccess) {
-      return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
-    }
-  }
+  if (!(await requireAdminOrCron(req, res))) return;
 
   try {
     const service = SubscriptionCleanupService.getInstance();

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ChallengeHistoryEntry, ChallengeHistoryProps } from "../types";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 
 const ChallengeHistory: React.FC<ChallengeHistoryProps> = ({ username }) => {
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);
@@ -24,9 +24,7 @@ const ChallengeHistory: React.FC<ChallengeHistoryProps> = ({ username }) => {
         setLoading(true);
         setError(null);
         const response = await axios.get(
-          `/api/challenge-history?username=${encodeURIComponent(
-            username
-          )}&limit=${limit}&offset=${offset}`
+          `/api/challenge-history?limit=${limit}&offset=${offset}`
         );
 
         if (response.data && response.data.history) {

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
-import { getSession } from '../../utils/session';
+import { getAuthenticatedUser } from '../../middleware/auth';
 import { logger } from '../../utils/logger';
 
 // In-memory store for OAuth state (in production, use Redis or similar)
@@ -27,28 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let username: string | null = null;
-
-  // Try to get username from session first
-  try {
-    const session = await getSession(req);
-    if (session && session.username) {
-      username = session.username;
-      logger.info('Username obtained from session for viewer OAuth', { username });
-    }
-  } catch (error) {
-    logger.warn('Session check failed, will try username parameter', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-
-  // Fallback: Get username from query parameter (for cases where session expired but user is logged in on frontend)
-  if (!username) {
-    const usernameParam = req.query.username as string | undefined;
-    if (usernameParam) {
-      username = usernameParam;
-      logger.info('Username obtained from query parameter for viewer OAuth', { username });
-    }
+  // The account being linked is the signed-in user. There used to be a ?username= fallback
+  // "for expired sessions", which let anyone link their Twitch to someone else's account;
+  // the client now refreshes the session before starting this flow instead.
+  const signedIn = await getAuthenticatedUser(req);
+  const username: string | null = signedIn?.username ?? null;
+  if (username) {
+    logger.info('Username obtained from session for viewer OAuth', { username });
   }
 
   if (!username) {

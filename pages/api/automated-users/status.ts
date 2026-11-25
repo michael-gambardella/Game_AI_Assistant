@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdminOrCron } from '../../../middleware/auth';
 import { getScheduler } from '../../../utils/automatedUsersScheduler';
 
 /**
@@ -21,6 +22,10 @@ import { getScheduler } from '../../../utils/automatedUsersScheduler';
  * }
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Operations endpoint: admin session or scheduled job (Authorization: Bearer <CRON_SECRET>).
+  // Previously unauthenticated - anyone could run it.
+  if (!(await requireAdminOrCron(req, res))) return;
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

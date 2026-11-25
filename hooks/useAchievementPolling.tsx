@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { UseAchievementPollingProps, AchievementData } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const useAchievementPolling = ({
   username,
@@ -49,8 +50,8 @@ const useAchievementPolling = ({
           ? localStorage.getItem("lastAchievementChecked")
           : null;
 
+      // The user is identified by the auth cookie
       const requestBody = {
-        username,
         lastChecked: currentLastChecked,
       };
 
@@ -61,7 +62,7 @@ const useAchievementPolling = ({
       );
       console.log("localStorage lastChecked:", currentLastChecked);
 
-      const response = await fetch("/api/checkNewAchievements", {
+      const response = await authFetch("/api/checkNewAchievements", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

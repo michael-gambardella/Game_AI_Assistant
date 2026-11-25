@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from '../../utils/session';
+import { getAuthenticatedUser } from '../../middleware/auth';
+import { createOAuthState } from '../../utils/oauthState';
 import { withDatabase } from '../../utils/withDatabase';
-import User from '../../models/User';
 import { logger } from '../../utils/logger';
 
 /**
@@ -16,40 +16,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let username: string | null = null;
-
-  // Try to get username from session first
-  try {
-    const session = await getSession(req);
-    if (session && session.username) {
-      username = session.username;
-      logger.info('Username obtained from session', { username });
-    }
-  } catch (error) {
-    logger.warn('Session check failed, will try username parameter', {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-
-  // Fallback: Get username from query parameter (for cases where session expired but user is logged in on frontend)
-  if (!username) {
-    const usernameParam = req.query.username as string | undefined;
-    if (usernameParam) {
-      // Verify username exists in database
-      try {
-        const user = await User.findOne({ username: usernameParam }).select('username').lean();
-        if (user) {
-          username = usernameParam;
-          logger.info('Username obtained from query parameter', { username });
-        } else {
-          logger.warn('Username from query parameter not found in database', { usernameParam });
-        }
-      } catch (error) {
-        logger.error('Error verifying username from query parameter', {
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-    }
+  // The account being linked is the signed-in user. There used to be a ?username= fallback
+  // "for expired sessions", which let anyone link their Twitch to someone else's account;
+  // the client now refreshes the session before starting this flow instead.
+  const signedIn = await getAuthenticatedUser(req);
+  const username: string | null = signedIn?.username ?? null;
+  if (username) {
+    logger.info('Username obtained from session', { username });
   }
 
   if (!username) {
@@ -88,14 +61,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     'user:read:email'
   ].join(' ');
 
-  // Create state parameter to prevent CSRF and link to Video Game Wingman username
-  // State format: timestamp:username:random
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  const state = `${timestamp}:${username}:${random}`;
-  
-  // Store state in session/cookie for verification (optional, we can also verify via username in state)
-  // For now, we'll verify via state parameter in callback
+  // Signed, expiring state naming the account to link (verified in twitchBotCallback).
+  // The old "timestamp:username:random" state was trusted as-is, so anyone could craft one.
+  const state = createOAuthState(username, 'twitch-bot');
 
   // Construct the Twitch OAuth2 authorization URL
   const twitchAuthUrl = `${authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirectUri}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;

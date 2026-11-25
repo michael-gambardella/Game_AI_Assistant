@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
 import { ChallengeProgress, ChallengeProgresses, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../../types';
@@ -25,7 +26,10 @@ async function handler(
 ) {
   if (req.method === 'GET') {
     try {
-      const { username } = req.query;
+      // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+      const authUser = await requireUser(req, res);
+      if (!authUser) return;
+      const { username } = authUser;
 
       if (!username || typeof username !== 'string') {
         return res.status(400).json({ error: 'Username is required' });
@@ -106,7 +110,11 @@ async function handler(
 
   if (req.method === 'POST') {
     try {
-      const { username, progress, progresses } = req.body;
+      // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+      const authUser = await requireUser(req, res);
+      if (!authUser) return;
+      const { username } = authUser;
+      const { progress, progresses } = req.body;
 
       // Debug logging in development
       if (process.env.NODE_ENV === 'development') {

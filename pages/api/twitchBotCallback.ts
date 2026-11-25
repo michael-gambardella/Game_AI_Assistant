@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { withDatabase } from '../../utils/withDatabase';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
+import { verifyOAuthState } from '../../utils/oauthState';
 import User from '../../models/User';
 import { joinChannel } from '../../utils/twitchBot';
 import { logger } from '../../utils/logger';
@@ -119,15 +120,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Missing state parameter' });
   }
 
-  // Parse state: timestamp:username:random
-  const decodedState = decodeURIComponent(state as string);
-  const stateParts = decodedState.split(':');
-  if (stateParts.length < 2) {
-    logger.error('Invalid state format', { state: decodedState.substring(0, 50) });
+  // The state is signed by twitchBotLogin for the signed-in user; anything forged, tampered
+  // with or older than 10 minutes is rejected (it used to be parsed and trusted as-is)
+  const verifiedUsername = verifyOAuthState(state, 'twitch-bot');
+  if (!verifiedUsername) {
+    logger.error('Invalid or expired state in bot callback');
     return res.status(400).json({ error: 'Invalid state parameter' });
   }
 
-  const streamerUsername = stateParts[1]; // Video Game Wingman username
+  const streamerUsername = verifiedUsername; // Video Game Wingman username
 
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
@@ -135,9 +136,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ? 'https://assistant.videogamewingman.com'
     : 'http://localhost:3000';
 
-  // Verify username exists in database (we trust the state parameter since it was created by us)
-  // Note: We're not strictly verifying session here because tokens might be expired
-  // but the user is still "logged in" from frontend perspective
+  // Verify username exists in database (the signed state proves twitchBotLogin issued it
+  // for this signed-in user)
   try {
     const user = await User.findOne({ username: streamerUsername }).select('username').lean();
     if (!user) {

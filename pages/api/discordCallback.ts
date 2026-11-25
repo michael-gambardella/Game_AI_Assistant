@@ -127,11 +127,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       discordUserId: discordUser.id ? '[REDACTED]' : undefined
     });
 
+    // Only trust the email if Discord has verified the user owns it. syncUserData links
+    // accounts by email (it re-keys the Wingman account with that email to this Discord ID,
+    // and the Discord bot identifies users by that ID), and Discord lets anyone put an
+    // unverified address - including someone else's - on their account.
+    if (!discordUser.verified || !discordUser.email) {
+      logger.warn('Discord account email missing or unverified - refusing to link', {
+        hasEmail: !!discordUser.email,
+        verified: !!discordUser.verified
+      });
+      const errorUrl = new URL(process.env.NODE_ENV === 'production'
+        ? 'https://assistant.videogamewingman.com'
+        : 'http://localhost:3000');
+      errorUrl.searchParams.append('auth', 'error');
+      errorUrl.searchParams.append('error', 'discord_email_unverified');
+      return res.redirect(errorUrl.toString());
+    }
+
     // Step 4: Sync user data (this will link Discord ID to Video Game Wingman account)
     logger.info('Starting user data sync');
     try {
-      // syncUserData will update the user's userId to the Discord ID
-      // We need to verify this is the correct user first
+      // syncUserData will update the user's userId to the Discord ID - safe now that the
+      // email is verified by Discord (checked above)
       await syncUserData(discordUser.id, discordUser.email);
       logger.info('User data synced successfully', {
         expectedUsername,

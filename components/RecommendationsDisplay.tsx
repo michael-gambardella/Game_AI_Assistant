@@ -12,7 +12,7 @@
 "use client";
 
 import { useState, useMemo, memo, useRef } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 
 import { RecommendationsDisplayProps } from "@/types";
 
@@ -39,7 +39,7 @@ const RecommendationsDisplay = memo(
 
       setIsDismissing(true);
       try {
-        await axios.post("/api/dismiss-recommendations", { username });
+        await axios.post("/api/dismiss-recommendations", {});
         setIsDismissed(true);
         if (onDismiss) {
           onDismiss();

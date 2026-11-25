@@ -6,6 +6,7 @@ import Image from "next/image";
 import axios from "axios";
 import { botConfig } from "@/config/botConfig";
 import { BotStats } from "@/types";
+import { ensureTokenValid } from "../../utils/tokenRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -46,15 +47,12 @@ function TwitchBotProfileContent() {
   }, []);
 
   // Handle adding the bot to the channel
-  const handleAddToChannel = () => {
+  const handleAddToChannel = async () => {
     setIsAdding(true);
-    // Get username from localStorage as fallback if session is expired
-    const username = localStorage.getItem("username");
-    // Redirect to OAuth flow with username as query parameter
-    const loginUrl = username
-      ? `/api/twitchBotLogin?username=${encodeURIComponent(username)}`
-      : "/api/twitchBotLogin";
-    window.location.href = loginUrl;
+    // The account to link comes from the session: refresh it first (an idle tab's access
+    // token may have expired, and a page navigation can't refresh it), then start OAuth
+    await ensureTokenValid();
+    window.location.href = "/api/twitchBotLogin";
   };
 
   // Format date

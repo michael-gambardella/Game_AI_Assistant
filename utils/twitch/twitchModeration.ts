@@ -1,28 +1,10 @@
-import { containsOffensiveContent } from '../contentModeration';
+import { findOffensiveWords } from '../contentModeration';
 import { logger } from '../logger';
 import { getClient } from '../twitchBot';
 import connectToMongoDB from '../mongodb';
 import TwitchUserViolation from '../../models/TwitchUserViolation';
 import TwitchModerationLog from '../../models/TwitchModerationLog';
 import { getModerationConfig } from '../../config/twitchModerationConfig';
-
-/**
- * Helper function to check for offensive words without violation tracking
- */
-async function checkWordsDirectly(message: string): Promise<string[]> {
-  // Dynamically import the word list
-  const contentModeration = await import('../contentModeration');
-  // Access the word list - we need to read the file or use a different approach
-  // For now, use containsOffensiveContent with a unique ID to avoid duplicate key errors
-  const uniqueId = `twitch_check_${Date.now()}_${Math.random()}`;
-  try {
-    const result = await containsOffensiveContent(message, uniqueId);
-    return result.offendingWords || [];
-  } catch {
-    // If it fails, return empty array (fail open)
-    return [];
-  }
-}
 
 /**
  * Violation result type from violation handler
@@ -76,30 +58,10 @@ export async function checkMessageContent(
         shouldProcess: true,
       };
     }
-    // Check for offensive words directly (without violation tracking)
-    // We handle violations separately using TwitchUserViolation model
-    // Import the word checking logic without triggering violation tracking
-    const contentModeration = await import('../contentModeration');
-    
-    // Use containsOffensiveContent but catch the violation tracking error
-    // The violation tracking uses old UserViolation model, which we don't need for Twitch
-    let moderationCheck;
-    try {
-      moderationCheck = await containsOffensiveContent(message, `twitch_${twitchUsername}_${Date.now()}`);
-    } catch (violationError: any) {
-      // If violation tracking fails (e.g., duplicate key), just check words manually
-      // This is expected for Twitch since we use separate violation tracking
-      if (violationError?.message?.includes('duplicate key') || violationError?.code === 11000) {
-        // Duplicate key error - violation was already tracked, just check words
-        const foundWords = await checkWordsDirectly(message);
-        moderationCheck = {
-          isOffensive: foundWords.length > 0,
-          offendingWords: foundWords
-        };
-      } else {
-        throw violationError; // Re-throw if it's a different error
-      }
-    }
+    // Pure word check - records nothing. Violations are tracked separately in TwitchUserViolation
+    // (the recording check used before also wrote a junk UserViolation record per message).
+    const offendingWords = findOffensiveWords(message);
+    const moderationCheck = { isOffensive: offendingWords.length > 0, offendingWords };
 
     if (!moderationCheck.isOffensive) {
       // Content is clean - allow processing
@@ -174,12 +136,9 @@ export async function checkAIResponse(
       };
     }
     
-    // Use existing content moderation utility
-    // Note: We use a special identifier for AI responses to avoid penalizing users
-    const moderationCheck = await containsOffensiveContent(
-      response,
-      `ai_response_${twitchUsername}_${Date.now()}` // Unique identifier to avoid user penalties
-    );
+    // Pure word check on the AI's reply - records nothing, so no user is ever penalized
+    const offendingWords = findOffensiveWords(response);
+    const moderationCheck = { isOffensive: offendingWords.length > 0, offendingWords };
 
     if (!moderationCheck.isOffensive) {
       // Response is clean - allow sending

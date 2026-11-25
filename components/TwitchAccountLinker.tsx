@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { ensureTokenValid } from "../utils/tokenRefresh";
 
 interface TwitchAccountLinkerProps {
   twitchUsername?: string | null;
@@ -37,16 +38,13 @@ const TwitchAccountLinker: React.FC<TwitchAccountLinkerProps> = ({
     }
   }, []);
 
-  const handleLinkAccount = () => {
+  const handleLinkAccount = async () => {
     setLoading(true);
     setError(null);
-    // Get username from localStorage as fallback if session is expired
-    const username = localStorage.getItem("username");
-    // Redirect to OAuth flow with username as query parameter
-    const loginUrl = username
-      ? `/api/twitchViewerLogin?username=${encodeURIComponent(username)}`
-      : "/api/twitchViewerLogin";
-    window.location.href = loginUrl;
+    // The account to link comes from the session: refresh it first (an idle tab's access
+    // token may have expired, and a page navigation can't refresh it), then start OAuth
+    await ensureTokenValid();
+    window.location.href = "/api/twitchViewerLogin";
   };
 
   const handleUnlinkAccount = async () => {

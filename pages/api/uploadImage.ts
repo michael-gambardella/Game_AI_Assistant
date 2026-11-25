@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import formidable from 'formidable';
 import path from 'path';
 import fs from 'fs';
@@ -85,6 +86,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Uploader is the signed-in user, checked before the upload is parsed. The username used to
+  // be an optional form field, so leaving it out skipped the rate limit, the ban check and
+  // violation tracking, and naming someone else put the strikes on them.
+  const authUser = await requireUser(req, res);
+  if (!authUser) return;
+  const { username } = authUser;
+
   try {
     // Create temp uploads directory if it doesn't exist
     if (!fs.existsSync(tempUploadDir)) {
@@ -106,11 +114,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
-    const [fields, files] = await form.parse(req);
+    const [, files] = await form.parse(req);
     const uploadedFile = files.image?.[0];
-    
-    // Extract username from form fields (optional for question system, but good for violation tracking)
-    const username = Array.isArray(fields.username) ? fields.username[0] : fields.username;
     
     if (!uploadedFile) {
       return res.status(400).json({ error: 'No image file uploaded' });

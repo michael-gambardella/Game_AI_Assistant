@@ -149,8 +149,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
 
       // Fetch streak data
       try {
-        const streakResponse = await fetch(
-          `/api/streak?username=${encodeURIComponent(storedUsername)}`
+        const streakResponse = await authFetch(
+          `/api/streak`
         );
         if (streakResponse.ok) {
           const streakData = await streakResponse.json();
@@ -165,8 +165,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
 
       // Fetch stats data
       try {
-        const statsResponse = await fetch(
-          `/api/stats?username=${encodeURIComponent(storedUsername)}`
+        const statsResponse = await authFetch(
+          `/api/stats`
         );
         if (statsResponse.ok) {
           const statsData = await statsResponse.json();
@@ -322,8 +322,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
         // Wait a bit for database write to complete
         await new Promise((resolve) => setTimeout(resolve, 500));
         try {
-          const statsResponse = await fetch(
-            `/api/stats?username=${encodeURIComponent(username)}`
+          const statsResponse = await authFetch(
+            `/api/stats`
           );
           if (statsResponse.ok) {
             const statsData = await statsResponse.json();

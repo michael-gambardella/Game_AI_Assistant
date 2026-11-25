@@ -196,3 +196,18 @@ export const hasCronSecret = (req: NextApiRequest): boolean => {
   const b = crypto.createHash('sha256').update(`Bearer ${secret}`).digest();
   return crypto.timingSafeEqual(a, b);
 };
+
+/**
+ * For operations endpoints: allows a scheduled job (Authorization: Bearer <CRON_SECRET>) or
+ * the signed-in admin. Sends 401/403 itself and returns false when neither applies.
+ * Usage: if (!(await requireAdminOrCron(req, res))) return;
+ */
+export const requireAdminOrCron = async (
+  req: NextApiRequest,
+  res: NextApiResponse
+): Promise<boolean> => {
+  if (hasCronSecret(req)) {
+    return true;
+  }
+  return !!(await requireAdminUser(req, res));
+};

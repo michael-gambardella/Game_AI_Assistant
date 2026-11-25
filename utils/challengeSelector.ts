@@ -1,6 +1,6 @@
 import { DailyChallenge, ChallengeProgress } from "../types";
 import { DAILY_CHALLENGES } from "./dailyChallenges";
-import axios from "axios";
+import axios from "./axiosConfig";
 
 /**
  * Get today's date in YYYY-MM-DD format
@@ -161,7 +161,7 @@ export async function getChallengeProgress(
 
   try {
     const response = await axios.get(
-      `/api/challenge-progress?username=${encodeURIComponent(username)}`
+      `/api/challenge-progress`
     );
 
     if (response.data && response.data.progress) {
@@ -201,7 +201,7 @@ export async function getChallengesProgress(
 
   try {
     const response = await axios.get(
-      `/api/challenge-progress?username=${encodeURIComponent(username)}`
+      `/api/challenge-progress`
     );
 
     if (response.data && response.data.progresses) {
@@ -248,7 +248,6 @@ export async function saveChallengeProgress(
 
   try {
     await axios.post("/api/challenge-progress", {
-      username,
       progress,
     });
   } catch (error) {
@@ -274,7 +273,6 @@ export async function saveChallengesProgress(
 
   try {
     await axios.post("/api/challenge-progress", {
-      username,
       progresses, // Send as array
     });
   } catch (error) {

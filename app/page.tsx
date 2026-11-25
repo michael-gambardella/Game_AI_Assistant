@@ -29,6 +29,7 @@ import { isLongGuide, extractGuideTitle } from "../utils/guideDetection";
 import { trackQuestionAsked } from "../utils/analytics";
 import { getSourceName } from "../utils/linkShortener";
 import { authFetch } from "../utils/authFetch";
+import { ensureTokenValid } from "../utils/tokenRefresh";
 // import { useRouter } from "next/navigation";
 
 const STRATEGY_ADVISOR_PROMPT =
@@ -790,10 +791,10 @@ export default function Home() {
         }
 
         // Check user type (pro vs free)
-        const usageResponse = await fetch("/api/usageStatus", {
+        const usageResponse = await authFetch("/api/usageStatus", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({}),
         });
 
         if (usageResponse.ok) {
@@ -885,10 +886,7 @@ export default function Home() {
         try {
           const formData = new FormData();
           formData.append("image", image);
-          // Add username for violation tracking
-          if (username) {
-            formData.append("username", username);
-          }
+          // (uploader is identified by the auth cookie; violations are recorded against them)
 
           const uploadRes = await axios.post("/api/uploadImage", formData);
 
@@ -1169,16 +1167,11 @@ export default function Home() {
   };
 
   // handle twitch authentication (for linking viewer accounts)
-  const handleTwitchAuth = () => {
-    // Get username from localStorage
-    const username = localStorage.getItem("username");
-
-    // Use the new dedicated viewer OAuth flow
-    const loginUrl = username
-      ? `/api/twitchViewerLogin?username=${encodeURIComponent(username)}`
-      : "/api/twitchViewerLogin";
-
-    window.location.href = loginUrl;
+  const handleTwitchAuth = async () => {
+    // The account to link comes from the session: refresh it first (an idle tab's access
+    // token may have expired, and a page navigation can't refresh it), then start OAuth
+    await ensureTokenValid();
+    window.location.href = "/api/twitchViewerLogin";
   };
 
   const handleSteamAuth = () => {
@@ -2965,9 +2958,7 @@ export default function Home() {
                               setRecommendationsLoading(true);
                               setRecommendationsMessage(null);
                               const recRes = await axios.get(
-                                `/api/recommendations?username=${encodeURIComponent(
-                                  username
-                                )}&question=${encodeURIComponent(question)}`
+                                `/api/recommendations?question=${encodeURIComponent(question)}`
                               );
                               // console.log(
                               //   "[Recommendations] Fetch response:",

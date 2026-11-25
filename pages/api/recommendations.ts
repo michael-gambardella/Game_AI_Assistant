@@ -8,6 +8,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { requireUser } from '../../middleware/auth';
 import { withDatabase } from '../../utils/withDatabase';
 import { generatePersonalizedRecommendations } from '../../utils/generateRecommendations';
 
@@ -19,7 +20,11 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { username, question, forceShow } = req.query;
+  // Identity comes from the signed-in session, never the request (middleware/auth.ts)
+  const authUser = await requireUser(req, res);
+  if (!authUser) return;
+  const { username } = authUser;
+  const { question, forceShow } = req.query;
 
   if (!username || typeof username !== 'string') {
     return res.status(400).json({ 

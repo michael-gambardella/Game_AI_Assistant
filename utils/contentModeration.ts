@@ -537,23 +537,31 @@ const OFFENSIVE_WORDS = [
 ];
 
 /**
- * Checks content for offensive words.
- *
- * NOTE: when offensive content is found this also RECORDS a violation (warning/ban) against
- * `userId`, which is the username key of the violation record. Callers must pass the
- * offender's current username (or a throwaway id, as the Discord/Twitch bots do) and must
- * NOT call handleContentViolation again for the same content - use the returned
- * violationResult instead, or the offense counts twice and bans come early.
+ * Returns the offensive words/phrases found in `content` (whole-word, case-insensitive).
+ * Pure check - records nothing. For callers that track violations themselves, like the
+ * Discord and Twitch bots (DiscordUserViolation / TwitchUserViolation).
  */
-export const containsOffensiveContent = async (content: string, userId: string) => {
-  // First do a quick local check using word boundaries to match whole words only
-  const foundWords = OFFENSIVE_WORDS.filter(word => {
+export const findOffensiveWords = (content: string): string[] =>
+  OFFENSIVE_WORDS.filter(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // (?<!\w) and (?!\w) act like \b but also work when the entry starts/ends
     // with a non-word character (e.g. "Jr." ending with a period).
     const wordBoundaryRegex = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i');
     return wordBoundaryRegex.test(content);
   });
+
+/**
+ * Checks content for offensive words.
+ *
+ * NOTE: when offensive content is found this also RECORDS a violation (warning/ban) against
+ * `userId`, which is the username key of the violation record. Callers must pass the
+ * offender's current username and must NOT call handleContentViolation again for the same
+ * content - use the returned violationResult instead, or the offense counts twice and bans
+ * come early. To check without recording anything, use findOffensiveWords.
+ */
+export const containsOffensiveContent = async (content: string, userId: string) => {
+  // First do a quick local check using word boundaries to match whole words only
+  const foundWords = findOffensiveWords(content);
 
   if (foundWords.length === 0) {
     return {

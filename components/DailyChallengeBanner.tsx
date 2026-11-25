@@ -21,6 +21,7 @@ import { getChallengeStreakInfo } from "../utils/challengeStreak";
 import { getNextMilestoneInfo } from "../utils/checkChallengeRewards";
 import { formatRewardMessage } from "../utils/challengeRewards";
 import { DailyChallengeBannerProps, ChallengeWithProgress } from "../types";
+import { authFetch } from "../utils/authFetch";
 
 const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
   username,
@@ -45,8 +46,8 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
       try {
         // CRITICAL: First fetch progress from backend to see which challenges are already saved
         // This ensures we show the same challenges that were saved, not regenerate new ones
-        const response = await fetch(
-          `/api/challenge-progress?username=${encodeURIComponent(username)}`
+        const response = await authFetch(
+          `/api/challenge-progress`
         );
 
         let backendProgresses: ChallengeProgress[] = [];
@@ -242,8 +243,8 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
           await saveChallengesProgress(username, progressesToSave);
 
           // Fetch updated data after saving (streak, rewards)
-          const updatedResponse = await fetch(
-            `/api/challenge-progress?username=${encodeURIComponent(username)}`
+          const updatedResponse = await authFetch(
+            `/api/challenge-progress`
           );
           if (updatedResponse.ok) {
             const updatedData = await updatedResponse.json();
