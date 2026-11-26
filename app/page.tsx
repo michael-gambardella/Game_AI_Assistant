@@ -202,6 +202,37 @@ export default function Home() {
     }
   }, []);
 
+  // Show account-linking errors sent back in the URL (?auth=error&error=<code>) - the Discord
+  // callback redirects here when a link is refused or fails - then remove those params so a
+  // refresh doesn't show the message again
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("auth") !== "error") return;
+
+    const messages: Record<string, string> = {
+      discord_email_unverified:
+        "We couldn't link your Discord account because Discord hasn't verified its email address. Verify your email in Discord (User Settings → My Account), then try connecting again.",
+      invalid_state:
+        "That Discord connection request expired or was already used. Please try connecting Discord again.",
+      missing_state:
+        "That Discord connection request was incomplete. Please try connecting Discord again.",
+    };
+    setError(
+      messages[urlParams.get("error") ?? ""] ??
+        "Something went wrong connecting your Discord account. Please try again."
+    );
+
+    ["auth", "error", "error_time"].forEach((key) => urlParams.delete(key));
+    const remaining = urlParams.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (remaining ? `?${remaining}` : "")
+    );
+  }, []);
+
   // Check for query parameter to show sign-in modal (runs first, independently)
   useEffect(() => {
     if (typeof window === "undefined") return;

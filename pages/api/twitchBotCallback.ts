@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { withDatabase } from '../../utils/withDatabase';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
-import { verifyOAuthState } from '../../utils/oauthState';
+import { verifyOAuthState, clearOAuthStateCookie } from '../../utils/oauthState';
 import User from '../../models/User';
 import { joinChannel } from '../../utils/twitchBot';
 import { logger } from '../../utils/logger';
@@ -122,7 +122,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // The state is signed by twitchBotLogin for the signed-in user; anything forged, tampered
   // with or older than 10 minutes is rejected (it used to be parsed and trusted as-is)
-  const verifiedUsername = verifyOAuthState(state, 'twitch-bot');
+  const verifiedUsername = verifyOAuthState(state, 'twitch-bot', req);
+  clearOAuthStateCookie(res, 'twitch-bot');
   if (!verifiedUsername) {
     logger.error('Invalid or expired state in bot callback');
     return res.status(400).json({ error: 'Invalid state parameter' });

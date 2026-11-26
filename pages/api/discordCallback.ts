@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getDiscordOAuth2Token, fetchDiscordUser } from '../../utils/discordAuth';
 import { syncUserData } from '../../utils/proAccessUtil';
 import { logger } from '../../utils/logger';
-import { verifyOAuthState } from './discordLogin';
+import { verifyOAuthState, clearOAuthStateCookie } from '../../utils/oauthState';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check request method
@@ -56,11 +56,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Decode URL-encoded state (Discord returns it URL-encoded)
   const state = decodeURIComponent(rawState);
   
-  const stateVerification = verifyOAuthState(state);
-  if (!stateVerification.valid || !stateVerification.username) {
+  // Signed by discordLogin and presented by the same browser (state cookie); single-use
+  const verifiedUsername = verifyOAuthState(state, 'discord', req);
+  clearOAuthStateCookie(res, 'discord');
+  if (!verifiedUsername) {
     logger.error('Invalid or expired state parameter', {
       hasState: !!rawState,
-      stateValid: stateVerification.valid,
+      stateValid: false,
       stateLength: rawState?.length,
       // Log first few chars for debugging (not the full state for security)
       statePreview: rawState?.substring(0, 20)
@@ -73,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect(errorUrl.toString());
   }
 
-  const expectedUsername = stateVerification.username;
+  const expectedUsername = verifiedUsername;
   logger.info('State verified successfully', {
     username: expectedUsername
   });

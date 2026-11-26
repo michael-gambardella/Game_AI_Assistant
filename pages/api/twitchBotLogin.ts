@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthenticatedUser } from '../../middleware/auth';
-import { createOAuthState } from '../../utils/oauthState';
+import { createOAuthState, bindOAuthStateToBrowser } from '../../utils/oauthState';
 import { withDatabase } from '../../utils/withDatabase';
 import { logger } from '../../utils/logger';
 
@@ -64,6 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Signed, expiring state naming the account to link (verified in twitchBotCallback).
   // The old "timestamp:username:random" state was trusted as-is, so anyone could craft one.
   const state = createOAuthState(username, 'twitch-bot');
+  bindOAuthStateToBrowser(res, 'twitch-bot', state);
 
   // Construct the Twitch OAuth2 authorization URL
   const twitchAuthUrl = `${authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirectUri}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`;

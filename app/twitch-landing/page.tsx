@@ -13,7 +13,22 @@ function TwitchLandingContent() {
   const router = useRouter();
   const channelName = searchParams?.get("channel") ?? null;
   const authStatus = searchParams?.get("auth") ?? null;
+  const error = searchParams?.get("error") ?? null;
   const [isAdding, setIsAdding] = useState(false);
+
+  // Error message for the code twitchBotLogin / twitchBotCallback sent back
+  const getErrorMessage = () => {
+    switch (error) {
+      case "login_required":
+        return "You must be signed in to Video Game Wingman to add the bot to your channel. Please sign in and try again.";
+      case "user_not_found":
+        return "Your Video Game Wingman account was not found. Please sign in and try again.";
+      case "verification_failed":
+        return "We couldn't verify your account. Please try again in a moment.";
+      default:
+        return "There was an error adding the bot to your channel. Please try again.";
+    }
+  };
 
   useEffect(() => {
     // If auth was successful and we have a channel, show success message
@@ -82,10 +97,7 @@ function TwitchLandingContent() {
             <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-4">
               Authorization Failed
             </h1>
-            <p className="text-gray-600 text-center mb-6">
-              There was an error adding the bot to your channel. Please try
-              again.
-            </p>
+            <p className="text-gray-600 text-center mb-6">{getErrorMessage()}</p>
             <button
               onClick={handleAddToChannel}
               disabled={isAdding}

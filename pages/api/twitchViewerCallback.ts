@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { withDatabase } from '../../utils/withDatabase';
 import User from '../../models/User';
-import { verifyOAuthState } from './twitchViewerLogin';
+import { verifyOAuthState, clearOAuthStateCookie } from '../../utils/oauthState';
 import { logger } from '../../utils/logger';
 
 /**
@@ -84,17 +84,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     parts: decodedState.split(':').length
   });
   
-  const stateVerification = verifyOAuthState(decodedState);
-  if (!stateVerification.valid || !stateVerification.username) {
+  // Signed by twitchViewerLogin and presented by the same browser (state cookie); single-use
+  const verifiedUsername = verifyOAuthState(decodedState, 'twitch-viewer', req);
+  clearOAuthStateCookie(res, 'twitch-viewer');
+  if (!verifiedUsername) {
     logger.error('Invalid state parameter in viewer callback', {
       state: decodedState.substring(0, 100), // Log more of the state
       stateLength: decodedState.length,
       hasColon: decodedState.split(':').length > 1,
       parts: decodedState.split(':').length,
-      verificationResult: {
-        valid: stateVerification.valid,
-        hasUsername: !!stateVerification.username
-      }
+      verificationResult: { valid: false }
     });
     const errorUrl = new URL('/twitch-viewer-landing', domain);
     errorUrl.searchParams.append('auth', 'error');
@@ -103,10 +102,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
   
   logger.info('State verification successful', {
-    username: stateVerification.username
+    username: verifiedUsername
   });
 
-  const username = stateVerification.username;
+  const username = verifiedUsername;
 
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
